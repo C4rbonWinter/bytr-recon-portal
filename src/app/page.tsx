@@ -16,12 +16,14 @@ interface Deal {
   patientName: string
   clinic: 'TR01' | 'TR02' | 'TR04'
   salesperson: string
+  dealType: 'Double O' | 'Double Z' | 'Single L' | 'Onyx' | 'Other'
   planTotal: number
   collected: number
   verified: boolean
   status: 'verified' | 'partial' | 'unpaid' | 'flagged'
   payments: Payment[]
   dealMonth: string // Format: "2026-01" for January 2026
+  notes: string
 }
 
 interface User {
@@ -36,16 +38,16 @@ const currentUser: User = { name: 'Scot', role: 'salesperson' }
 
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
-  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified', dealMonth: '2026-01', payments: [
+  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', dealType: 'Double O', planTotal: 25600, collected: 25000, verified: true, status: 'verified', dealMonth: '2026-01', notes: '', payments: [
     { id: 'p1', amount: 10000, method: 'Cherry', date: '2026-01-15', verified: true },
     { id: 'p2', amount: 15000, method: 'Credit Card', date: '2026-01-20', verified: true },
   ]},
-  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', planTotal: 11760, collected: 9760, verified: false, status: 'partial', dealMonth: '2026-02', payments: [
+  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', dealType: 'Double Z', planTotal: 11760, collected: 9760, verified: false, status: 'partial', dealMonth: '2026-02', notes: 'Waiting on final payment', payments: [
     { id: 'p3', amount: 5000, method: 'CareCredit', date: '2026-02-01', verified: true },
     { id: 'p4', amount: 4760, method: 'Cash', date: '2026-02-05', verified: false },
   ]},
-  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', dealMonth: '2026-02', payments: [] },
-  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', planTotal: 13250, collected: 13250, verified: true, status: 'verified', dealMonth: '2025-12', payments: [
+  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', dealType: 'Single L', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', dealMonth: '2026-02', notes: 'Approved but not checked out', payments: [] },
+  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', dealType: 'Onyx', planTotal: 13250, collected: 13250, verified: true, status: 'verified', dealMonth: '2025-12', notes: '', payments: [
     { id: 'p5', amount: 13250, method: 'Proceed', date: '2025-12-28', verified: true },
   ]},
 ]
@@ -280,8 +282,10 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
     patientName: '',
     clinic: '',
     salesperson: isSalesperson ? currentUser.name : '', // Auto-assign for salespeople
+    dealType: '',
     planTotal: '',
     invoiceLink: '',
+    notes: '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -344,6 +348,22 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
             </div>
           )}
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Deal Type</label>
+            <select
+              value={formData.dealType}
+              onChange={(e) => setFormData({ ...formData, dealType: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2"
+              required
+            >
+              <option value="">Select type...</option>
+              <option value="Double O">Double O (Double Onyx)</option>
+              <option value="Double Z">Double Z (Double Zirconia)</option>
+              <option value="Single L">Single L</option>
+              <option value="Onyx">Onyx</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Plan Total</label>
             <div className="relative">
               <span className="absolute left-3 top-2 text-gray-500">$</span>
@@ -365,6 +385,16 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
               onChange={(e) => setFormData({ ...formData, invoiceLink: e.target.value })}
               className="w-full border rounded-lg px-3 py-2"
               placeholder="https://docs.google.com/..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full border rounded-lg px-3 py-2"
+              rows={2}
+              placeholder="Any additional notes..."
             />
           </div>
           <div className="flex gap-3 pt-2">
@@ -430,7 +460,9 @@ function DealDetailModal({
         <div className="flex justify-between items-center p-4 border-b">
           <div>
             <h2 className="text-lg font-semibold">{deal.patientName}</h2>
-            <p className="text-sm text-gray-500">{deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${deal.salesperson}`}</p>
+            <p className="text-sm text-gray-500">
+              {deal.dealType} • {deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${deal.salesperson}`}
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
@@ -451,6 +483,13 @@ function DealDetailModal({
               <div className="text-xs text-gray-500">Balance</div>
             </div>
           </div>
+
+          {/* Notes */}
+          {deal.notes && (
+            <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+              <p className="text-sm text-gray-700">{deal.notes}</p>
+            </div>
+          )}
 
           {/* Payments */}
           <div className="mb-4">
