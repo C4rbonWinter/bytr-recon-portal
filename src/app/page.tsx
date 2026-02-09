@@ -388,7 +388,7 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
               onChange={(e) => handleNameChange(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
               className="w-full border rounded-lg px-3 py-2"
-              placeholder={formData.clinic ? "Start typing to search GHL..." : "Select clinic first"}
+              placeholder={formData.clinic ? "Start typing..." : "Select clinic first"}
               disabled={!formData.clinic}
               required
             />

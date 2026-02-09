@@ -17,6 +17,13 @@ interface GHLContact {
   customFields?: Array<{ id: string; key?: string; field_key?: string; value: string }>
 }
 
+// Convert to Title Case
+function toTitleCase(str: string): string {
+  return str.toLowerCase().split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ')
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get('q')
@@ -70,10 +77,11 @@ export async function GET(request: NextRequest) {
                  f.id === 'KRfLpJEPnmT4Tsb8ov9K' // SG invoice link field
         )
         
-        // Build name from available fields
-        const name = contact.contactName || 
+        // Build name from available fields and title case it
+        const rawName = contact.contactName || 
           `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
           'Unknown'
+        const name = toTitleCase(rawName)
         
         return {
           id: contact.id,
