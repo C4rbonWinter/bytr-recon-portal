@@ -217,12 +217,23 @@ export default function Dashboard() {
                   {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
                   <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(deal.planTotal)}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-green-600">{formatCurrency(deal.collected)}</span>
-                    {deal.payments.length > 0 && (
-                      <span className="ml-2 text-sm" title={deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}`).join('\n')}>
-                        {Array.from(new Set(deal.payments.map(p => p.method))).map(m => methodIcons[m]).join('')}
-                      </span>
-                    )}
+                    <span 
+                      className="text-green-600 cursor-help relative group"
+                    >
+                      {formatCurrency(deal.collected)}
+                      {deal.payments.length > 0 && (
+                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-10">
+                          <span className="bg-gray-900 text-white text-xs rounded py-2 px-3 whitespace-nowrap shadow-lg">
+                            {deal.payments.map((p, i) => (
+                              <span key={p.id} className="block">
+                                {p.method}: {formatCurrency(p.amount)}
+                                {!p.verified && <span className="text-yellow-400 ml-1">⏳</span>}
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
                   <td className="px-4 py-3 text-center text-xl">{statusIcons[deal.status]}</td>
