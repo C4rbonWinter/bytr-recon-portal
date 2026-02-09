@@ -9,11 +9,12 @@ const locations = [
 
 interface GHLContact {
   id: string
-  firstName: string
-  lastName: string
+  firstName?: string
+  lastName?: string
+  contactName?: string
   email?: string
   phone?: string
-  customFields?: Array<{ id: string; key: string; value: string }>
+  customFields?: Array<{ id: string; key?: string; field_key?: string; value: string }>
 }
 
 export async function GET(request: NextRequest) {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     
     try {
       const response = await fetch(
-        `https://services.leadconnectorhq.com/contacts/search?query=${encodeURIComponent(query)}&locationId=${loc.id}&limit=10`,
+        `https://services.leadconnectorhq.com/contacts/?query=${encodeURIComponent(query)}&locationId=${loc.id}&limit=10`,
         {
           headers: {
             'Authorization': `Bearer ${loc.token}`,
@@ -62,14 +63,21 @@ export async function GET(request: NextRequest) {
       const contacts: GHLContact[] = data.contacts || []
       
       return contacts.map((contact) => {
-        // Look for invoice link in custom fields
+        // Look for invoice link in custom fields (field ID varies by location)
         const invoiceLinkField = contact.customFields?.find(
-          (f) => f.key === 'contact.invoice_link' || f.id === 'KRfLpJEPnmT4Tsb8ov9K'
+          (f) => f.key === 'contact.invoice_link' || 
+                 f.field_key === 'contact.invoice_link' ||
+                 f.id === 'KRfLpJEPnmT4Tsb8ov9K' // SG invoice link field
         )
+        
+        // Build name from available fields
+        const name = contact.contactName || 
+          `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+          'Unknown'
         
         return {
           id: contact.id,
-          name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+          name,
           clinic: loc.clinic,
           clinicName: loc.name,
           email: contact.email,
