@@ -302,16 +302,21 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
 
-  // Search GHL as user types
+  // Search GHL as user types - only search selected clinic
   const searchPatients = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([])
       return
     }
     
+    if (!formData.clinic) {
+      setSearchResults([])
+      return
+    }
+    
     setIsSearching(true)
     try {
-      const response = await fetch(`/api/ghl/search?q=${encodeURIComponent(query)}`)
+      const response = await fetch(`/api/ghl/search?q=${encodeURIComponent(query)}&clinic=${formData.clinic}`)
       const data = await response.json()
       setSearchResults(data.results || [])
       setShowResults(true)
@@ -358,6 +363,23 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Clinic</label>
+            <select
+              value={formData.clinic}
+              onChange={(e) => {
+                setFormData({ ...formData, clinic: e.target.value, patientName: '' })
+                setSearchResults([])
+              }}
+              className="w-full border rounded-lg px-3 py-2"
+              required
+            >
+              <option value="">Select clinic first...</option>
+              <option value="TR01">TR01 (SG)</option>
+              <option value="TR02">TR02 (IRV)</option>
+              <option value="TR04">TR04 (LV)</option>
+            </select>
+          </div>
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
             <input
@@ -366,7 +388,8 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
               onChange={(e) => handleNameChange(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
               className="w-full border rounded-lg px-3 py-2"
-              placeholder="Start typing to search GHL..."
+              placeholder={formData.clinic ? "Start typing to search GHL..." : "Select clinic first"}
+              disabled={!formData.clinic}
               required
             />
             {isSearching && (
@@ -383,8 +406,7 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
                   >
                     <div className="font-medium">{result.name}</div>
                     <div className="text-xs text-gray-500">
-                      {result.clinic} ({result.clinicName})
-                      {result.invoiceLink && ' • Has invoice'}
+                      {result.invoiceLink && '📋 Has invoice'}
                     </div>
                   </button>
                 ))}
@@ -395,20 +417,6 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
                 No patients found in GHL. You can still create a new deal.
               </div>
             )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Clinic</label>
-            <select
-              value={formData.clinic}
-              onChange={(e) => setFormData({ ...formData, clinic: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2"
-              required
-            >
-              <option value="">Select clinic...</option>
-              <option value="TR01">TR01 (SG)</option>
-              <option value="TR02">TR02 (IRV)</option>
-              <option value="TR04">TR04 (LV)</option>
-            </select>
           </div>
           {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
           {!isSalesperson && (

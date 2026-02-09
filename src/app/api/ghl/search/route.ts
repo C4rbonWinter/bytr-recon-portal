@@ -19,6 +19,7 @@ interface GHLContact {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query = searchParams.get('q')
+  const clinicFilter = searchParams.get('clinic') // Optional: TR01, TR02, TR04
   
   if (!query || query.length < 2) {
     return NextResponse.json({ results: [] })
@@ -35,8 +36,13 @@ export async function GET(request: NextRequest) {
     planTotal?: number
   }> = []
 
-  // Search all locations in parallel
-  const searches = locations.map(async (loc) => {
+  // Filter locations if clinic specified
+  const locationsToSearch = clinicFilter 
+    ? locations.filter(loc => loc.clinic === clinicFilter)
+    : locations
+
+  // Search locations in parallel
+  const searches = locationsToSearch.map(async (loc) => {
     if (!loc.token) return []
     
     try {
