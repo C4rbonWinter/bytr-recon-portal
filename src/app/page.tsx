@@ -220,7 +220,7 @@ export default function Dashboard() {
                     <span className="text-green-600">{formatCurrency(deal.collected)}</span>
                     {deal.payments.length > 0 && (
                       <span className="ml-2 text-sm" title={deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}`).join('\n')}>
-                        {[...new Set(deal.payments.map(p => p.method))].map(m => methodIcons[m]).join('')}
+                        {Array.from(new Set(deal.payments.map(p => p.method))).map(m => methodIcons[m]).join('')}
                       </span>
                     )}
                   </td>
