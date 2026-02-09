@@ -6,7 +6,7 @@ import { useState } from 'react'
 interface Payment {
   id: string
   amount: number
-  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'PPref' | 'Check'
+  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'PPref' | 'Check' | 'Alphaeon' | 'Sunbit' | 'HFD' | 'LendingClub' | 'Insurance' | 'ACH/Wire'
   date: string
   verified: boolean
 }
@@ -70,6 +70,12 @@ const methodIcons: Record<string, string> = {
   'Proceed': '📄',
   'PPref': '🏦',
   'Check': '📝',
+  'Alphaeon': '🅰️',
+  'Sunbit': '☀️',
+  'HFD': '🏥',
+  'LendingClub': '🏛️',
+  'Insurance': '🛡️',
+  'ACH/Wire': '🔌',
 }
 
 export default function Dashboard() {
@@ -515,13 +521,25 @@ function DealDetailModal({
                   required
                 >
                   <option value="">Select method...</option>
-                  <option value="Cash">💵 Cash</option>
-                  <option value="Credit Card">💳 Credit Card</option>
-                  <option value="Cherry">🍒 Cherry</option>
-                  <option value="CareCredit">💙 CareCredit</option>
-                  <option value="Proceed">📄 Proceed</option>
-                  <option value="PPref">🏦 PPref</option>
-                  <option value="Check">📝 Check</option>
+                  <optgroup label="Financing">
+                    <option value="Cherry">Cherry</option>
+                    <option value="CareCredit">CareCredit</option>
+                    <option value="Proceed">Proceed</option>
+                    <option value="PPref">PatientPreferred</option>
+                    <option value="Alphaeon">Alphaeon</option>
+                    <option value="Sunbit">Sunbit</option>
+                    <option value="HFD">HFD</option>
+                    <option value="LendingClub">LendingClub</option>
+                  </optgroup>
+                  <optgroup label="Direct Payment">
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Check">Check</option>
+                    <option value="ACH/Wire">ACH/Wire</option>
+                  </optgroup>
+                  <optgroup label="Other">
+                    <option value="Insurance">Insurance</option>
+                  </optgroup>
                 </select>
               </div>
               {paymentForm.method === 'Cash' && (
