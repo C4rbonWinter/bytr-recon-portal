@@ -62,6 +62,16 @@ const statusIcons: Record<string, string> = {
   flagged: '🚩',
 }
 
+const methodIcons: Record<string, string> = {
+  'Cash': '💵',
+  'Credit Card': '💳',
+  'Cherry': '🍒',
+  'CareCredit': '💙',
+  'Proceed': '📄',
+  'PPref': '🏦',
+  'Check': '📝',
+}
+
 export default function Dashboard() {
   const [allDeals, setAllDeals] = useState<Deal[]>(mockDeals)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
@@ -206,7 +216,14 @@ export default function Dashboard() {
                   <td className="px-4 py-3 text-gray-600">{deal.clinic} ({clinicNames[deal.clinic]})</td>
                   {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
                   <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(deal.planTotal)}</td>
-                  <td className="px-4 py-3 text-right text-green-600">{formatCurrency(deal.collected)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="text-green-600">{formatCurrency(deal.collected)}</span>
+                    {deal.payments.length > 0 && (
+                      <span className="ml-2 text-sm" title={deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}`).join('\n')}>
+                        {[...new Set(deal.payments.map(p => p.method))].map(m => methodIcons[m]).join('')}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
                   <td className="px-4 py-3 text-center text-xl">{statusIcons[deal.status]}</td>
                 </tr>
