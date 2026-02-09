@@ -14,6 +14,16 @@ interface Deal {
   status: 'verified' | 'partial' | 'unpaid' | 'flagged'
 }
 
+interface User {
+  name: string
+  role: 'admin' | 'salesperson'
+}
+
+// Mock current user - will come from auth later
+// Set to null or { name: 'Cole', role: 'admin' } for admin view
+// Set to { name: 'Scot', role: 'salesperson' } for salesperson view
+const currentUser: User = { name: 'Cole', role: 'admin' }
+
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
   { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified' },
@@ -155,17 +165,19 @@ export default function Dashboard() {
 
       {/* New Deal Modal */}
       {showNewDeal && (
-        <NewDealModal onClose={() => setShowNewDeal(false)} />
+        <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} />
       )}
     </div>
   )
 }
 
-function NewDealModal({ onClose }: { onClose: () => void }) {
+function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUser: User }) {
+  const isSalesperson = currentUser.role === 'salesperson'
+  
   const [formData, setFormData] = useState({
     patientName: '',
     clinic: '',
-    salesperson: '',
+    salesperson: isSalesperson ? currentUser.name : '', // Auto-assign for salespeople
     planTotal: '',
     invoiceLink: '',
   })
@@ -209,23 +221,26 @@ function NewDealModal({ onClose }: { onClose: () => void }) {
               <option value="TR04">TR04 - Las Vegas</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson</label>
-            <select
-              value={formData.salesperson}
-              onChange={(e) => setFormData({ ...formData, salesperson: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2"
-              required
-            >
-              <option value="">Select salesperson...</option>
-              <option value="Chris">Chris</option>
-              <option value="Josh">Josh</option>
-              <option value="Molly">Molly</option>
-              <option value="Scot">Scot</option>
-              <option value="Jake">Jake</option>
-              <option value="Blake">Blake</option>
-            </select>
-          </div>
+          {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
+          {!isSalesperson && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson</label>
+              <select
+                value={formData.salesperson}
+                onChange={(e) => setFormData({ ...formData, salesperson: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2"
+                required
+              >
+                <option value="">Select salesperson...</option>
+                <option value="Chris">Chris</option>
+                <option value="Josh">Josh</option>
+                <option value="Molly">Molly</option>
+                <option value="Scot">Scot</option>
+                <option value="Jake">Jake</option>
+                <option value="Blake">Blake</option>
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Plan Total</label>
             <div className="relative">
