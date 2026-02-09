@@ -21,6 +21,7 @@ interface Deal {
   verified: boolean
   status: 'verified' | 'partial' | 'unpaid' | 'flagged'
   payments: Payment[]
+  dealMonth: string // Format: "2026-01" for January 2026
 }
 
 interface User {
@@ -35,17 +36,17 @@ const currentUser: User = { name: 'Scot', role: 'salesperson' }
 
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
-  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified', payments: [
+  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified', dealMonth: '2026-01', payments: [
     { id: 'p1', amount: 10000, method: 'Cherry', date: '2026-01-15', verified: true },
     { id: 'p2', amount: 15000, method: 'Credit Card', date: '2026-01-20', verified: true },
   ]},
-  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', planTotal: 11760, collected: 9760, verified: false, status: 'partial', payments: [
-    { id: 'p3', amount: 5000, method: 'CareCredit', date: '2026-01-18', verified: true },
-    { id: 'p4', amount: 4760, method: 'Cash', date: '2026-01-25', verified: false },
+  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', planTotal: 11760, collected: 9760, verified: false, status: 'partial', dealMonth: '2026-02', payments: [
+    { id: 'p3', amount: 5000, method: 'CareCredit', date: '2026-02-01', verified: true },
+    { id: 'p4', amount: 4760, method: 'Cash', date: '2026-02-05', verified: false },
   ]},
-  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', payments: [] },
-  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', planTotal: 13250, collected: 13250, verified: true, status: 'verified', payments: [
-    { id: 'p5', amount: 13250, method: 'Proceed', date: '2026-01-10', verified: true },
+  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', dealMonth: '2026-02', payments: [] },
+  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', planTotal: 13250, collected: 13250, verified: true, status: 'verified', dealMonth: '2025-12', payments: [
+    { id: 'p5', amount: 13250, method: 'Proceed', date: '2025-12-28', verified: true },
   ]},
 ]
 
@@ -82,6 +83,7 @@ export default function Dashboard() {
   const [allDeals, setAllDeals] = useState<Deal[]>(mockDeals)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [monthFilter, setMonthFilter] = useState<string>('all')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
 
@@ -123,10 +125,14 @@ export default function Dashboard() {
   const totalPending = totalPlanned - totalCollected
   const flaggedCount = deals.filter(d => d.status === 'flagged' || d.status === 'partial').length
 
+  // Get unique months from deals for filter dropdown
+  const availableMonths = Array.from(new Set(deals.map(d => d.dealMonth))).sort().reverse()
+
   // Filtered deals
   const filteredDeals = deals.filter(d => {
     if (clinicFilter !== 'all' && d.clinic !== clinicFilter) return false
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
+    if (monthFilter !== 'all' && d.dealMonth !== monthFilter) return false
     return true
   })
 
@@ -178,6 +184,18 @@ export default function Dashboard() {
 
         {/* Filters */}
         <div className="flex gap-4 mb-4">
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 bg-white"
+          >
+            <option value="all">All Months</option>
+            {availableMonths.map(month => {
+              const [year, m] = month.split('-')
+              const monthName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
+              return <option key={month} value={month}>{monthName}</option>
+            })}
+          </select>
           <select
             value={clinicFilter}
             onChange={(e) => setClinicFilter(e.target.value)}
