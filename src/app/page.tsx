@@ -6,7 +6,7 @@ import { useState } from 'react'
 interface Payment {
   id: string
   amount: number
-  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'PPref' | 'Check' | 'Alphaeon' | 'Sunbit' | 'HFD' | 'LendingClub' | 'Insurance' | 'ACH/Wire'
+  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'Patient Preferred' | 'Check' | 'Alphaeon' | 'Sunbit' | 'HFD' | 'LendingClub' | 'Insurance' | 'ACH/Wire'
   date: string
   verified: boolean
 }
@@ -68,7 +68,7 @@ const methodIcons: Record<string, string> = {
   'Cherry': '🍒',
   'CareCredit': '💙',
   'Proceed': '📄',
-  'PPref': '🏦',
+  'Patient Preferred': '🏦',
   'Check': '📝',
   'Alphaeon': '🅰️',
   'Sunbit': '☀️',
@@ -512,7 +512,7 @@ function DealDetailModal({
                     <option value="Cherry">Cherry</option>
                     <option value="CareCredit">CareCredit</option>
                     <option value="Proceed">Proceed</option>
-                    <option value="PPref">PatientPreferred</option>
+                    <option value="Patient Preferred">Patient Preferred</option>
                     <option value="Alphaeon">Alphaeon</option>
                     <option value="Sunbit">Sunbit</option>
                     <option value="HFD">HFD</option>
