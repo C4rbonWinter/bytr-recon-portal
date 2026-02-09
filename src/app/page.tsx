@@ -33,9 +33,9 @@ const mockDeals: Deal[] = [
 ]
 
 const clinicNames: Record<string, string> = {
-  TR01: 'San Gabriel',
-  TR02: 'Irvine', 
-  TR04: 'Las Vegas',
+  TR01: 'SG',
+  TR02: 'IRV', 
+  TR04: 'LV',
 }
 
 const statusIcons: Record<string, string> = {
@@ -125,9 +125,9 @@ export default function Dashboard() {
             className="border rounded-lg px-3 py-2 bg-white"
           >
             <option value="all">All Clinics</option>
-            <option value="TR01">TR01 - San Gabriel</option>
-            <option value="TR02">TR02 - Irvine</option>
-            <option value="TR04">TR04 - Las Vegas</option>
+            <option value="TR01">TR01 (SG)</option>
+            <option value="TR02">TR02 (IRV)</option>
+            <option value="TR04">TR04 (LV)</option>
           </select>
           <select
             value={statusFilter}
@@ -160,7 +160,7 @@ export default function Dashboard() {
               {filteredDeals.map((deal) => (
                 <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-4 py-3 font-medium text-gray-900">{deal.patientName}</td>
-                  <td className="px-4 py-3 text-gray-600">{deal.clinic} - {clinicNames[deal.clinic]}</td>
+                  <td className="px-4 py-3 text-gray-600">{deal.clinic} ({clinicNames[deal.clinic]})</td>
                   {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
                   <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(deal.planTotal)}</td>
                   <td className="px-4 py-3 text-right text-green-600">{formatCurrency(deal.collected)}</td>
@@ -226,9 +226,9 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
               required
             >
               <option value="">Select clinic...</option>
-              <option value="TR01">TR01 - San Gabriel</option>
-              <option value="TR02">TR02 - Irvine</option>
-              <option value="TR04">TR04 - Las Vegas</option>
+              <option value="TR01">TR01 (SG)</option>
+              <option value="TR02">TR02 (IRV)</option>
+              <option value="TR04">TR04 (LV)</option>
             </select>
           </div>
           {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
