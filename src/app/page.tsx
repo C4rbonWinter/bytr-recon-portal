@@ -3,6 +3,14 @@
 import { useState } from 'react'
 
 // Types
+interface Payment {
+  id: string
+  amount: number
+  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'PPref' | 'Check'
+  date: string
+  verified: boolean
+}
+
 interface Deal {
   id: string
   patientName: string
@@ -12,6 +20,7 @@ interface Deal {
   collected: number
   verified: boolean
   status: 'verified' | 'partial' | 'unpaid' | 'flagged'
+  payments: Payment[]
 }
 
 interface User {
@@ -26,10 +35,18 @@ const currentUser: User = { name: 'Scot', role: 'salesperson' }
 
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
-  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified' },
-  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', planTotal: 11760, collected: 9760, verified: false, status: 'partial' },
-  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', planTotal: 26700, collected: 0, verified: false, status: 'unpaid' },
-  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', planTotal: 13250, collected: 13250, verified: true, status: 'verified' },
+  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', planTotal: 25600, collected: 25000, verified: true, status: 'verified', payments: [
+    { id: 'p1', amount: 10000, method: 'Cherry', date: '2026-01-15', verified: true },
+    { id: 'p2', amount: 15000, method: 'Credit Card', date: '2026-01-20', verified: true },
+  ]},
+  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', planTotal: 11760, collected: 9760, verified: false, status: 'partial', payments: [
+    { id: 'p3', amount: 5000, method: 'CareCredit', date: '2026-01-18', verified: true },
+    { id: 'p4', amount: 4760, method: 'Cash', date: '2026-01-25', verified: false },
+  ]},
+  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', payments: [] },
+  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', planTotal: 13250, collected: 13250, verified: true, status: 'verified', payments: [
+    { id: 'p5', amount: 13250, method: 'Proceed', date: '2026-01-10', verified: true },
+  ]},
 ]
 
 const clinicNames: Record<string, string> = {
@@ -46,12 +63,38 @@ const statusIcons: Record<string, string> = {
 }
 
 export default function Dashboard() {
-  const [allDeals] = useState<Deal[]>(mockDeals)
+  const [allDeals, setAllDeals] = useState<Deal[]>(mockDeals)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showNewDeal, setShowNewDeal] = useState(false)
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
 
   const isSalesperson = currentUser.role === 'salesperson'
+
+  const handleAddPayment = (dealId: string, payment: Omit<Payment, 'id' | 'verified'>) => {
+    setAllDeals(prev => prev.map(deal => {
+      if (deal.id !== dealId) return deal
+      const newPayment: Payment = {
+        ...payment,
+        id: `p${Date.now()}`,
+        verified: payment.method !== 'Cash', // Cash needs verification
+      }
+      const newPayments = [...deal.payments, newPayment]
+      const newCollected = newPayments.reduce((sum, p) => sum + p.amount, 0)
+      const allVerified = newPayments.every(p => p.verified)
+      let newStatus: Deal['status'] = 'unpaid'
+      if (newCollected >= deal.planTotal && allVerified) newStatus = 'verified'
+      else if (newCollected > 0 && newCollected < deal.planTotal) newStatus = 'partial'
+      else if (newCollected >= deal.planTotal && !allVerified) newStatus = 'partial'
+      return { ...deal, payments: newPayments, collected: newCollected, status: newStatus, verified: allVerified && newCollected >= deal.planTotal }
+    }))
+    // Update selectedDeal if it's the one we modified
+    setSelectedDeal(prev => {
+      if (!prev || prev.id !== dealId) return prev
+      const updated = allDeals.find(d => d.id === dealId)
+      return updated || prev
+    })
+  }
 
   // Filter to user's deals only for salespeople
   const deals = isSalesperson 
@@ -158,7 +201,7 @@ export default function Dashboard() {
             </thead>
             <tbody className="divide-y">
               {filteredDeals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer">
+                <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
                   <td className="px-4 py-3 font-medium text-gray-900">{deal.patientName}</td>
                   <td className="px-4 py-3 text-gray-600">{deal.clinic} ({clinicNames[deal.clinic]})</td>
                   {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
@@ -176,6 +219,16 @@ export default function Dashboard() {
       {/* New Deal Modal */}
       {showNewDeal && (
         <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} />
+      )}
+
+      {/* Deal Detail Modal */}
+      {selectedDeal && (
+        <DealDetailModal 
+          deal={selectedDeal} 
+          onClose={() => setSelectedDeal(null)} 
+          onAddPayment={(payment) => handleAddPayment(selectedDeal.id, payment)}
+          isSalesperson={isSalesperson}
+        />
       )}
     </div>
   )
@@ -291,6 +344,190 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function DealDetailModal({ 
+  deal, 
+  onClose, 
+  onAddPayment,
+  isSalesperson 
+}: { 
+  deal: Deal
+  onClose: () => void
+  onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
+  isSalesperson: boolean
+}) {
+  const [showAddPayment, setShowAddPayment] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    method: '' as Payment['method'] | '',
+    date: new Date().toISOString().split('T')[0],
+  })
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
+  }
+
+  const handleAddPayment = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!paymentForm.method) return
+    onAddPayment({
+      amount: Number(paymentForm.amount),
+      method: paymentForm.method as Payment['method'],
+      date: paymentForm.date,
+    })
+    setPaymentForm({ amount: '', method: '', date: new Date().toISOString().split('T')[0] })
+    setShowAddPayment(false)
+  }
+
+  const balance = deal.planTotal - deal.collected
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <div>
+            <h2 className="text-lg font-semibold">{deal.patientName}</h2>
+            <p className="text-sm text-gray-500">{deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${deal.salesperson}`}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+
+        <div className="p-4 overflow-y-auto flex-1">
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-lg font-bold">{formatCurrency(deal.planTotal)}</div>
+              <div className="text-xs text-gray-500">Plan Total</div>
+            </div>
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-lg font-bold text-green-600">{formatCurrency(deal.collected)}</div>
+              <div className="text-xs text-gray-500">Collected</div>
+            </div>
+            <div className="text-center p-3 bg-orange-50 rounded-lg">
+              <div className="text-lg font-bold text-orange-500">{formatCurrency(balance)}</div>
+              <div className="text-xs text-gray-500">Balance</div>
+            </div>
+          </div>
+
+          {/* Payments */}
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-medium">Payments</h3>
+              <button
+                onClick={() => setShowAddPayment(true)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                + Add Payment
+              </button>
+            </div>
+
+            {deal.payments.length === 0 ? (
+              <p className="text-gray-400 text-sm italic">No payments recorded</p>
+            ) : (
+              <div className="space-y-2">
+                {deal.payments.map((payment) => (
+                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="font-medium">{formatCurrency(payment.amount)}</span>
+                      <span className="text-gray-500 text-sm ml-2">{payment.method}</span>
+                      {payment.method === 'Cash' && !payment.verified && (
+                        <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Verification</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {payment.date}
+                      {payment.verified && <span className="ml-2">✅</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Add Payment Form */}
+          {showAddPayment && (
+            <form onSubmit={handleAddPayment} className="p-4 bg-blue-50 rounded-lg space-y-3">
+              <h4 className="font-medium text-sm">Add Payment</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-2 text-gray-500 text-sm">$</span>
+                    <input
+                      type="number"
+                      value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                      className="w-full border rounded px-2 py-1.5 pl-5 text-sm"
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={paymentForm.date}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
+                    className="w-full border rounded px-2 py-1.5 text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Method</label>
+                <select
+                  value={paymentForm.method}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value as Payment['method'] })}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  required
+                >
+                  <option value="">Select method...</option>
+                  <option value="Cash">💵 Cash</option>
+                  <option value="Credit Card">💳 Credit Card</option>
+                  <option value="Cherry">🍒 Cherry</option>
+                  <option value="CareCredit">💙 CareCredit</option>
+                  <option value="Proceed">📄 Proceed</option>
+                  <option value="PPref">🏦 PPref</option>
+                  <option value="Check">📝 Check</option>
+                </select>
+              </div>
+              {paymentForm.method === 'Cash' && (
+                <p className="text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
+                  ⚠️ Cash payments require admin verification
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddPayment(false)}
+                  className="flex-1 px-3 py-1.5 border rounded text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                >
+                  Add Payment
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        <div className="p-4 border-t">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )
