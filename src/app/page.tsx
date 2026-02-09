@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 
 // Types
 interface Payment {
@@ -31,10 +32,7 @@ interface User {
   role: 'admin' | 'salesperson'
 }
 
-// Mock current user - will come from auth later
-// Set to { name: 'Cole', role: 'admin' } for admin view
-// Set to { name: 'Scot', role: 'salesperson' } for salesperson view
-const currentUser: User = { name: 'Scot', role: 'salesperson' }
+// User comes from session now (see Dashboard component)
 
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
@@ -82,12 +80,19 @@ const methodIcons: Record<string, string> = {
 }
 
 export default function Dashboard() {
+  const { data: session } = useSession()
   const [allDeals, setAllDeals] = useState<Deal[]>(mockDeals)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
+
+  // Get user from session
+  const currentUser: User = {
+    name: session?.user?.name || 'User',
+    role: (session?.user as any)?.role || 'salesperson',
+  }
 
   const isSalesperson = currentUser.role === 'salesperson'
 
@@ -158,7 +163,20 @@ export default function Dashboard() {
             >
               + New Deal
             </button>
-            <span className="text-gray-600">{currentUser.name} {isSalesperson ? '' : '▼'}</span>
+            <div className="relative group">
+              <span className="text-gray-600 cursor-pointer">{currentUser.name} ▼</span>
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border hidden group-hover:block z-20">
+                <div className="px-4 py-2 text-sm text-gray-500 border-b">
+                  {session?.user?.email}
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
