@@ -20,9 +20,9 @@ interface User {
 }
 
 // Mock current user - will come from auth later
-// Set to null or { name: 'Cole', role: 'admin' } for admin view
+// Set to { name: 'Cole', role: 'admin' } for admin view
 // Set to { name: 'Scot', role: 'salesperson' } for salesperson view
-const currentUser: User = { name: 'Cole', role: 'admin' }
+const currentUser: User = { name: 'Scot', role: 'salesperson' }
 
 // Mock data - will be replaced with API calls
 const mockDeals: Deal[] = [
@@ -46,12 +46,19 @@ const statusIcons: Record<string, string> = {
 }
 
 export default function Dashboard() {
-  const [deals] = useState<Deal[]>(mockDeals)
+  const [allDeals] = useState<Deal[]>(mockDeals)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showNewDeal, setShowNewDeal] = useState(false)
 
-  // Stats
+  const isSalesperson = currentUser.role === 'salesperson'
+
+  // Filter to user's deals only for salespeople
+  const deals = isSalesperson 
+    ? allDeals.filter(d => d.salesperson === currentUser.name)
+    : allDeals
+
+  // Stats (based on user's visible deals)
   const totalPlanned = deals.reduce((sum, d) => sum + d.planTotal, 0)
   const totalCollected = deals.reduce((sum, d) => sum + d.collected, 0)
   const totalPending = totalPlanned - totalCollected
@@ -73,7 +80,10 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">T+R Reconciliation Portal</h1>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">T+R Reconciliation Portal</h1>
+            {isSalesperson && <p className="text-sm text-gray-500">My Deals</p>}
+          </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowNewDeal(true)}
@@ -81,7 +91,7 @@ export default function Dashboard() {
             >
               + New Deal
             </button>
-            <span className="text-gray-600">Cole ▼</span>
+            <span className="text-gray-600">{currentUser.name} {isSalesperson ? '' : '▼'}</span>
           </div>
         </div>
       </header>
@@ -139,7 +149,7 @@ export default function Dashboard() {
               <tr>
                 <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Patient</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Clinic</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Salesperson</th>
+                {!isSalesperson && <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Salesperson</th>}
                 <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Plan Total</th>
                 <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Collected</th>
                 <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Balance</th>
@@ -151,7 +161,7 @@ export default function Dashboard() {
                 <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-4 py-3 font-medium text-gray-900">{deal.patientName}</td>
                   <td className="px-4 py-3 text-gray-600">{deal.clinic} - {clinicNames[deal.clinic]}</td>
-                  <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>
+                  {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
                   <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(deal.planTotal)}</td>
                   <td className="px-4 py-3 text-right text-green-600">{formatCurrency(deal.collected)}</td>
                   <td className="px-4 py-3 text-right text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
