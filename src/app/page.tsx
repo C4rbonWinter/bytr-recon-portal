@@ -275,6 +275,16 @@ export default function Dashboard() {
   )
 }
 
+interface GHLSearchResult {
+  id: string
+  name: string
+  clinic: string
+  clinicName: string
+  email?: string
+  phone?: string
+  invoiceLink?: string
+}
+
 function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUser: User }) {
   const isSalesperson = currentUser.role === 'salesperson'
   
@@ -287,6 +297,51 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
     invoiceLink: '',
     notes: '',
   })
+  
+  const [searchResults, setSearchResults] = useState<GHLSearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showResults, setShowResults] = useState(false)
+
+  // Search GHL as user types
+  const searchPatients = async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+    
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/ghl/search?q=${encodeURIComponent(query)}`)
+      const data = await response.json()
+      setSearchResults(data.results || [])
+      setShowResults(true)
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Debounced search
+  const handleNameChange = (value: string) => {
+    setFormData({ ...formData, patientName: value })
+    // Simple debounce
+    const timeoutId = setTimeout(() => searchPatients(value), 300)
+    return () => clearTimeout(timeoutId)
+  }
+
+  // Select a patient from search results
+  const selectPatient = (patient: GHLSearchResult) => {
+    setFormData({
+      ...formData,
+      patientName: patient.name,
+      clinic: patient.clinic,
+      invoiceLink: patient.invoiceLink || '',
+    })
+    setShowResults(false)
+    setSearchResults([])
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -303,15 +358,43 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
             <input
               type="text"
               value={formData.patientName}
-              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setShowResults(true)}
               className="w-full border rounded-lg px-3 py-2"
+              placeholder="Start typing to search GHL..."
               required
             />
+            {isSearching && (
+              <span className="absolute right-3 top-9 text-gray-400 text-sm">Searching...</span>
+            )}
+            {showResults && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => selectPatient(result)}
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b last:border-b-0"
+                  >
+                    <div className="font-medium">{result.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {result.clinic} ({result.clinicName})
+                      {result.invoiceLink && ' • Has invoice'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {showResults && searchResults.length === 0 && formData.patientName.length >= 2 && !isSearching && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg p-3 text-sm text-gray-500">
+                No patients found in GHL. You can still create a new deal.
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Clinic</label>
