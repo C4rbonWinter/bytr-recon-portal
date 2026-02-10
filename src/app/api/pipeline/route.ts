@@ -209,6 +209,9 @@ export async function GET(request: NextRequest) {
         // Skip if not in our pipeline stages
         if (!superStage) continue
         
+        // Skip test records
+        if (opp.name.toLowerCase().includes('test')) continue
+        
         // Skip if salesperson filter is set and doesn't match any of the IDs
         if (salespersonIds && !salespersonIds.includes(opp.assignedTo)) continue
         
