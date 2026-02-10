@@ -200,6 +200,7 @@ export async function GET(request: NextRequest) {
       closing: [],
       financing: [],
       won: [],
+      archive: [],
     }
     
     for (const card of cards) {

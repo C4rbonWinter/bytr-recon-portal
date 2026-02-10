@@ -1,7 +1,7 @@
 // Pipeline Stage Configuration
 // Maps GHL stage IDs to our simplified super stages
 
-export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won'] as const
+export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won', 'archive'] as const
 export type SuperStage = typeof SUPER_STAGES[number]
 
 export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; order: number }> = {
@@ -11,6 +11,7 @@ export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; ord
   closing: { name: 'Closing', color: 'bg-orange-100 dark:bg-orange-900/30', order: 3 },
   financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 4 },
   won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 5 },
+  archive: { name: 'Archive', color: 'bg-gray-100 dark:bg-gray-800/50', order: 6 },
 }
 
 // Stage NAME → Super Stage mapping (works across all clinics)
@@ -53,20 +54,27 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   'won': 'won',
   'closed': 'won',
   'sold': 'won',
+  
+  // Archive (cold leads that can be revived)
+  'delayed follow up': 'archive',
+  're engage': 'archive',
+  're-engage': 'archive',
+  'limbo': 'archive',
+  'rescheduled': 'archive',
 }
 
 // Stage names to exclude (lost, too early, or post-close)
 export const EXCLUDED_STAGE_NAMES = new Set([
-  // Lost/stalled
-  'lost', 'not interested', 'fico dnq', 'pp dnq', 'un qualified', 'limbo',
-  'no show', 'no show oc', 'no show cc', 'rescheduled',
+  // Lost/stalled (truly dead)
+  'lost', 'not interested', 'fico dnq', 'pp dnq', 'un qualified',
+  'no show', 'no show oc', 'no show cc',
   // Too early
   'activated', 'new lead from lp', 'new lead', 'lead created', 'un scheduled',
   // Post-close (already a Deal)
   'smile design', 'financials completed', 'pre surgery', 'surgery', 
   'surgery completed', 'after care', 'recall', 'testimonial',
   // Other exclusions
-  'uncategorized', 'delayed follow up', 're engage',
+  'uncategorized',
 ])
 
 // Get super stage from stage NAME (case-insensitive)

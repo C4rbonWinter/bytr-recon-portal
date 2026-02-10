@@ -51,6 +51,27 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+type SortOption = 'days' | 'newest' | 'oldest' | 'az' | 'value'
+
+function sortCards(cards: PipelineCard[], sortBy: SortOption): PipelineCard[] {
+  return [...cards].sort((a, b) => {
+    switch (sortBy) {
+      case 'days':
+        return b.daysInStage - a.daysInStage // Hottest (longest) first
+      case 'newest':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case 'oldest':
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      case 'az':
+        return a.name.localeCompare(b.name)
+      case 'value':
+        return b.value - a.value // Highest value first
+      default:
+        return 0
+    }
+  })
+}
+
 function DaysInStageBadge({ days }: { days: number }) {
   let color = 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
   if (days > 14) color = 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400'
@@ -113,15 +134,18 @@ function StageColumn({
   cards, 
   totals,
   onCardClick,
-  showSalesperson 
+  showSalesperson,
+  sortBy 
 }: { 
   stage: SuperStage
   cards: PipelineCard[]
   totals: { count: number; value: number }
   onCardClick: (card: PipelineCard) => void
   showSalesperson: boolean
+  sortBy: SortOption
 }) {
   const config = STAGE_CONFIG[stage]
+  const sortedCards = sortCards(cards, sortBy)
   
   return (
     <div className={`flex-1 min-w-[240px] max-w-[300px] ${config.color} rounded-lg p-2`}>
@@ -133,7 +157,7 @@ function StageColumn({
       </div>
       
       <div className="space-y-2">
-        {cards.map(card => (
+        {sortedCards.map(card => (
           <PipelineCardComponent 
             key={card.id} 
             card={card} 
@@ -164,6 +188,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
   const [clinicFilter, setClinicFilter] = useState<string>('')
   const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
+  const [sortBy, setSortBy] = useState<'days' | 'newest' | 'oldest' | 'az' | 'value'>('days')
 
   const fetchPipeline = async () => {
     try {
@@ -251,6 +276,18 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             </select>
           )}
           
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
+          >
+            <option value="days">Hottest First</option>
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="az">A-Z</option>
+            <option value="value">Highest Value</option>
+          </select>
+          
           <button
             onClick={fetchPipeline}
             className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -270,6 +307,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             totals={data.totals.byStage[stage]}
             onCardClick={setSelectedCard}
             showSalesperson={isAdmin}
+            sortBy={sortBy}
           />
         ))}
       </div>
