@@ -105,10 +105,10 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
   }
   
   try {
-    // Fetch both open and won opportunities (increased limit to 500)
+    // Fetch both open and won opportunities (GHL max limit is 100)
     const [openRes, wonRes] = await Promise.all([
       fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=500`,
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -117,7 +117,7 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
         }
       ),
       fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=500`,
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=100`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
