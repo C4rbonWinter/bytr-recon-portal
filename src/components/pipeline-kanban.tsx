@@ -51,20 +51,31 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-type SortOption = 'days' | 'newest' | 'oldest' | 'az' | 'value'
+type SortOption = 'days_desc' | 'days_asc' | 'newest' | 'oldest' | 'name_asc' | 'value_desc'
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'days_desc', label: 'Hottest (Days ↓)' },
+  { value: 'days_asc', label: 'Coldest (Days ↑)' },
+  { value: 'newest', label: 'Newest First' },
+  { value: 'oldest', label: 'Oldest First' },
+  { value: 'name_asc', label: 'A-Z' },
+  { value: 'value_desc', label: 'Value (High→Low)' },
+]
 
 function sortCards(cards: PipelineCard[], sortBy: SortOption): PipelineCard[] {
   return [...cards].sort((a, b) => {
     switch (sortBy) {
-      case 'days':
+      case 'days_desc':
         return b.daysInStage - a.daysInStage // Hottest (longest) first
+      case 'days_asc':
+        return a.daysInStage - b.daysInStage
       case 'newest':
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       case 'oldest':
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      case 'az':
+      case 'name_asc':
         return a.name.localeCompare(b.name)
-      case 'value':
+      case 'value_desc':
         return b.value - a.value // Highest value first
       default:
         return 0
@@ -188,7 +199,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
   const [clinicFilter, setClinicFilter] = useState<string>('')
   const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
-  const [sortBy, setSortBy] = useState<'days' | 'newest' | 'oldest' | 'az' | 'value'>('days')
+  const [sortBy, setSortBy] = useState<SortOption>('days_desc')
 
   const fetchPipeline = async () => {
     try {
@@ -281,11 +292,9 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
           >
-            <option value="days">Hottest First</option>
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="az">A-Z</option>
-            <option value="value">Highest Value</option>
+            {SORT_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           
           <button
