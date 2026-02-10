@@ -117,7 +117,7 @@ function StageColumn({
         </div>
       </div>
       
-      <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
+      <div className="space-y-2">
         {cards.map(card => (
           <PipelineCardComponent 
             key={card.id} 
