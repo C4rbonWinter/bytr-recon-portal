@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 
 // Types
@@ -17,6 +17,7 @@ interface Deal {
   patientName: string
   clinic: 'TR01' | 'TR02' | 'TR04'
   salesperson: string
+  sharedWith: string | null
   dealType: 'Double O' | 'Double Z' | 'Single L' | 'Onyx' | 'Other'
   planTotal: number
   collected: number
@@ -25,6 +26,7 @@ interface Deal {
   payments: Payment[]
   dealMonth: string // Format: "2026-01" for January 2026
   notes: string
+  invoiceLink: string
 }
 
 interface User {
@@ -34,21 +36,31 @@ interface User {
 
 // User comes from session now (see Dashboard component)
 
-// Mock data - will be replaced with API calls
-const mockDeals: Deal[] = [
-  { id: '1', patientName: 'Brandon Tipton', clinic: 'TR02', salesperson: 'Scot', dealType: 'Double O', planTotal: 25600, collected: 25000, verified: true, status: 'verified', dealMonth: '2026-01', notes: '', payments: [
-    { id: 'p1', amount: 10000, method: 'Cherry', date: '2026-01-15', verified: true },
-    { id: 'p2', amount: 15000, method: 'Credit Card', date: '2026-01-20', verified: true },
-  ]},
-  { id: '2', patientName: 'Lillie Jackson', clinic: 'TR02', salesperson: 'Scot', dealType: 'Double Z', planTotal: 11760, collected: 9760, verified: false, status: 'partial', dealMonth: '2026-02', notes: 'Waiting on final payment', payments: [
-    { id: 'p3', amount: 5000, method: 'CareCredit', date: '2026-02-01', verified: true },
-    { id: 'p4', amount: 4760, method: 'Cash', date: '2026-02-05', verified: false },
-  ]},
-  { id: '3', patientName: 'John Alessi', clinic: 'TR04', salesperson: 'Chris', dealType: 'Single L', planTotal: 26700, collected: 0, verified: false, status: 'unpaid', dealMonth: '2026-02', notes: 'Approved but not checked out', payments: [] },
-  { id: '4', patientName: 'Michael Preuett', clinic: 'TR01', salesperson: 'Scot', dealType: 'Onyx', planTotal: 13250, collected: 13250, verified: true, status: 'verified', dealMonth: '2025-12', notes: '', payments: [
-    { id: 'p5', amount: 13250, method: 'Proceed', date: '2025-12-28', verified: true },
-  ]},
-]
+// Transform API response to frontend format
+function transformDeal(apiDeal: any): Deal {
+  return {
+    id: apiDeal.id,
+    patientName: apiDeal.patient_name,
+    clinic: apiDeal.clinic,
+    salesperson: apiDeal.salesperson,
+    sharedWith: apiDeal.shared_with || null,
+    dealType: apiDeal.deal_type,
+    planTotal: apiDeal.plan_total,
+    collected: apiDeal.collected || 0,
+    verified: apiDeal.status === 'verified',
+    status: apiDeal.status,
+    dealMonth: apiDeal.deal_month,
+    notes: apiDeal.notes || '',
+    invoiceLink: apiDeal.invoice_link || '',
+    payments: (apiDeal.payments || []).map((p: any) => ({
+      id: p.id,
+      amount: p.amount,
+      method: p.method,
+      date: p.payment_date,
+      verified: p.verified,
+    })),
+  }
+}
 
 const clinicNames: Record<string, string> = {
   TR01: 'SG',
@@ -81,49 +93,115 @@ const methodIcons: Record<string, string> = {
 
 export default function Dashboard() {
   const { data: session } = useSession()
-  const [allDeals, setAllDeals] = useState<Deal[]>(mockDeals)
+  const [allDeals, setAllDeals] = useState<Deal[]>([])
+  const [loading, setLoading] = useState(true)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
 
-  // Get user from session
+  // Get user from session (default to Cole's admin view for dev/testing)
   const currentUser: User = {
-    name: session?.user?.name || 'User',
-    role: (session?.user as any)?.role || 'salesperson',
+    name: session?.user?.name || 'Cole',
+    role: (session?.user as any)?.role || 'admin',
   }
 
   const isSalesperson = currentUser.role === 'salesperson'
 
-  const handleAddPayment = (dealId: string, payment: Omit<Payment, 'id' | 'verified'>) => {
-    setAllDeals(prev => prev.map(deal => {
-      if (deal.id !== dealId) return deal
-      const newPayment: Payment = {
-        ...payment,
-        id: `p${Date.now()}`,
-        verified: payment.method !== 'Cash', // Cash needs verification
+  // Fetch deals from API
+  const fetchDeals = async () => {
+    try {
+      const response = await fetch('/api/deals')
+      const data = await response.json()
+      if (data.deals) {
+        setAllDeals(data.deals.map(transformDeal))
       }
-      const newPayments = [...deal.payments, newPayment]
-      const newCollected = newPayments.reduce((sum, p) => sum + p.amount, 0)
-      const allVerified = newPayments.every(p => p.verified)
-      let newStatus: Deal['status'] = 'unpaid'
-      if (newCollected >= deal.planTotal && allVerified) newStatus = 'verified'
-      else if (newCollected > 0 && newCollected < deal.planTotal) newStatus = 'partial'
-      else if (newCollected >= deal.planTotal && !allVerified) newStatus = 'partial'
-      return { ...deal, payments: newPayments, collected: newCollected, status: newStatus, verified: allVerified && newCollected >= deal.planTotal }
-    }))
-    // Update selectedDeal if it's the one we modified
-    setSelectedDeal(prev => {
-      if (!prev || prev.id !== dealId) return prev
-      const updated = allDeals.find(d => d.id === dealId)
-      return updated || prev
-    })
+    } catch (error) {
+      console.error('Failed to fetch deals:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Filter to user's deals only for salespeople
+  useEffect(() => {
+    fetchDeals()
+  }, [])
+
+  const handleAddPayment = async (dealId: string, payment: Omit<Payment, 'id' | 'verified'>) => {
+    try {
+      const response = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealId,
+          amount: payment.amount,
+          method: payment.method,
+          paymentDate: payment.date,
+          source: 'manual',
+        }),
+      })
+      
+      if (response.ok) {
+        // Refresh deals to get updated totals
+        await fetchDeals()
+        // Update selectedDeal
+        setSelectedDeal(prev => {
+          if (!prev || prev.id !== dealId) return prev
+          const updated = allDeals.find(d => d.id === dealId)
+          return updated || prev
+        })
+      }
+    } catch (error) {
+      console.error('Failed to add payment:', error)
+    }
+  }
+
+  const handleCreateDeal = async (dealData: any) => {
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dealData),
+      })
+      
+      if (response.ok) {
+        await fetchDeals()
+        setShowNewDeal(false)
+      }
+    } catch (error) {
+      console.error('Failed to create deal:', error)
+    }
+  }
+
+  const handleUpdateDeal = async (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => {
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...updates }),
+      })
+      
+      if (response.ok) {
+        await fetchDeals()
+        // Update the selected deal with new data
+        setSelectedDeal(prev => {
+          if (!prev || prev.id !== id) return prev
+          return { 
+            ...prev, 
+            ...(updates.sharedWith !== undefined && { sharedWith: updates.sharedWith }),
+            ...(updates.salesperson && { salesperson: updates.salesperson }),
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Failed to update deal:', error)
+    }
+  }
+
+  // Filter to user's deals only for salespeople (include shared deals)
   const deals = isSalesperson 
-    ? allDeals.filter(d => d.salesperson === currentUser.name)
+    ? allDeals.filter(d => d.salesperson === currentUser.name || d.sharedWith === currentUser.name)
     : allDeals
 
   // Stats (based on user's visible deals)
@@ -144,7 +222,16 @@ export default function Dashboard() {
   })
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
+    const hasDecimals = amount % 1 !== 0
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: hasDecimals ? 2 : 0, maximumFractionDigits: 2 }).format(amount)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading deals...</div>
+      </div>
+    )
   }
 
   return (
@@ -211,9 +298,13 @@ export default function Dashboard() {
           >
             <option value="all">All Months</option>
             {availableMonths.map(month => {
-              const [year, m] = month.split('-')
-              const monthName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
-              return <option key={month} value={month}>{monthName}</option>
+              // Handle both "2026-01" and "Jan 2026" formats
+              let displayName = month
+              if (month.includes('-')) {
+                const [year, m] = month.split('-')
+                displayName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
+              }
+              return <option key={month} value={month}>{displayName}</option>
             })}
           </select>
           <select
@@ -247,26 +338,46 @@ export default function Dashboard() {
                 <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Patient</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Clinic</th>
                 {!isSalesperson && <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Salesperson</th>}
-                <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Plan Total</th>
-                <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Collected</th>
-                <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">Balance</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Plan Total</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Collected</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Balance</th>
                 <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {filteredDeals.map((deal) => (
                 <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{deal.patientName}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {deal.patientName}
+                    {deal.sharedWith && (
+                      <span 
+                        className="ml-2 cursor-help" 
+                        title={`Shared with ${deal.sharedWith === currentUser.name ? deal.salesperson : deal.sharedWith}`}
+                      >🤝</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{deal.clinic} ({clinicNames[deal.clinic]})</td>
                   {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
-                  <td className="px-4 py-3 text-right text-gray-900">{formatCurrency(deal.planTotal)}</td>
+                  <td className="px-4 py-3 text-left text-gray-900">
+                    {formatCurrency(deal.planTotal)}
+                    {deal.invoiceLink && (
+                      <a 
+                        href={deal.invoiceLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="ml-1 hover:opacity-70"
+                        title="View invoice"
+                      >📋</a>
+                    )}
+                  </td>
                   <td 
-                    className="px-4 py-3 text-right text-green-600 cursor-help"
+                    className="px-4 py-3 text-left text-green-600 cursor-help"
                     title={deal.payments.length > 0 ? deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}${!p.verified ? ' (pending)' : ''}`).join('\n') : ''}
                   >
                     {formatCurrency(deal.collected)}
                   </td>
-                  <td className="px-4 py-3 text-right text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
+                  <td className="px-4 py-3 text-left text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
                   <td className="px-4 py-3 text-center text-xl">{statusIcons[deal.status]}</td>
                 </tr>
               ))}
@@ -277,7 +388,7 @@ export default function Dashboard() {
 
       {/* New Deal Modal */}
       {showNewDeal && (
-        <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} />
+        <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} onCreate={handleCreateDeal} />
       )}
 
       {/* Deal Detail Modal */}
@@ -286,6 +397,7 @@ export default function Dashboard() {
           deal={selectedDeal} 
           onClose={() => setSelectedDeal(null)} 
           onAddPayment={(payment) => handleAddPayment(selectedDeal.id, payment)}
+          onUpdateDeal={handleUpdateDeal}
           isSalesperson={isSalesperson}
         />
       )}
@@ -303,13 +415,14 @@ interface GHLSearchResult {
   invoiceLink?: string
 }
 
-function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUser: User }) {
+function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void; currentUser: User; onCreate: (data: any) => Promise<void> }) {
   const isSalesperson = currentUser.role === 'salesperson'
   
   const [formData, setFormData] = useState({
     patientName: '',
     clinic: '',
     salesperson: isSalesperson ? currentUser.name : '', // Auto-assign for salespeople
+    sharedWith: '',
     dealType: '',
     planTotal: '',
     invoiceLink: '',
@@ -366,11 +479,19 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
     setSearchResults([])
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: API call to create deal
-    console.log('Creating deal:', formData)
-    onClose()
+    await onCreate({
+      patientName: formData.patientName,
+      clinic: formData.clinic,
+      salesperson: formData.salesperson,
+      sharedWith: formData.sharedWith || null,
+      dealType: formData.dealType,
+      planTotal: formData.planTotal,
+      invoiceLink: formData.invoiceLink,
+      notes: formData.notes,
+      dealMonth: new Date().toISOString().slice(0, 7),
+    })
   }
 
   return (
@@ -435,9 +556,13 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
                 No patients found in GHL. You can still create a new deal.
               </div>
             )}
+            {formData.invoiceLink && (
+              <div className="mt-1 text-xs text-green-600">Invoice linked from GHL</div>
+            )}
           </div>
           {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
           {!isSalesperson && (
+            <>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson</label>
               <select
@@ -455,6 +580,7 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
                 <option value="Blake">Blake</option>
               </select>
             </div>
+            </>
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Deal Type</label>
@@ -486,16 +612,7 @@ function NewDealModal({ onClose, currentUser }: { onClose: () => void; currentUs
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Link (optional)</label>
-            <input
-              type="url"
-              value={formData.invoiceLink}
-              onChange={(e) => setFormData({ ...formData, invoiceLink: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="https://docs.google.com/..."
-            />
-          </div>
+          {/* Invoice link auto-populated from GHL when patient selected */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
             <textarea
@@ -531,22 +648,39 @@ function DealDetailModal({
   deal, 
   onClose, 
   onAddPayment,
+  onUpdateDeal,
   isSalesperson 
 }: { 
   deal: Deal
   onClose: () => void
   onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
+  onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => Promise<void>
   isSalesperson: boolean
 }) {
   const [showAddPayment, setShowAddPayment] = useState(false)
+  const [editingShared, setEditingShared] = useState(false)
+  const [editingSalesperson, setEditingSalesperson] = useState(false)
+  const [sharedWith, setSharedWith] = useState(deal.sharedWith || '')
+  const [salesperson, setSalesperson] = useState(deal.salesperson)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     method: '' as Payment['method'] | '',
     date: new Date().toISOString().split('T')[0],
   })
 
+  const handleSaveShared = async () => {
+    await onUpdateDeal(deal.id, { sharedWith: sharedWith || null })
+    setEditingShared(false)
+  }
+
+  const handleSaveSalesperson = async () => {
+    await onUpdateDeal(deal.id, { salesperson })
+    setEditingSalesperson(false)
+  }
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
+    const hasDecimals = amount % 1 !== 0
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: hasDecimals ? 2 : 0, maximumFractionDigits: 2 }).format(amount)
   }
 
   const handleAddPayment = (e: React.FormEvent) => {
@@ -580,7 +714,18 @@ function DealDetailModal({
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-lg font-bold">{formatCurrency(deal.planTotal)}</div>
+              <div className="text-lg font-bold">
+                {formatCurrency(deal.planTotal)}
+                {deal.invoiceLink && (
+                  <a 
+                    href={deal.invoiceLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="ml-1 hover:opacity-70"
+                    title="View invoice"
+                  >📋</a>
+                )}
+              </div>
               <div className="text-xs text-gray-500">Plan Total</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
@@ -599,6 +744,98 @@ function DealDetailModal({
               <p className="text-sm text-gray-700">{deal.notes}</p>
             </div>
           )}
+
+          {/* Salesperson (admin only) */}
+          {!isSalesperson && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">
+                  Salesperson: {editingSalesperson ? '' : deal.salesperson}
+                </span>
+                {!editingSalesperson ? (
+                  <button
+                    onClick={() => setEditingSalesperson(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={salesperson}
+                      onChange={(e) => setSalesperson(e.target.value)}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value="Chris">Chris</option>
+                      <option value="Josh">Josh</option>
+                      <option value="Molly">Molly</option>
+                      <option value="Scot">Scot</option>
+                      <option value="Jake">Jake</option>
+                      <option value="Blake">Blake</option>
+                      <option value="TBD">TBD</option>
+                    </select>
+                    <button
+                      onClick={handleSaveSalesperson}
+                      className="text-sm text-green-600 hover:text-green-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setEditingSalesperson(false); setSalesperson(deal.salesperson) }}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Shared With */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">
+                  Shared With: {editingShared ? '' : (deal.sharedWith || 'None')}
+                </span>
+                {!editingShared ? (
+                  <button
+                    onClick={() => setEditingShared(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    {deal.sharedWith ? 'Edit' : 'Add'}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={sharedWith}
+                      onChange={(e) => setSharedWith(e.target.value)}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value="">None</option>
+                      <option value="Chris">Chris</option>
+                      <option value="Josh">Josh</option>
+                      <option value="Molly">Molly</option>
+                      <option value="Scot">Scot</option>
+                      <option value="Jake">Jake</option>
+                      <option value="Blake">Blake</option>
+                    </select>
+                    <button
+                      onClick={handleSaveShared}
+                      className="text-sm text-green-600 hover:text-green-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setEditingShared(false); setSharedWith(deal.sharedWith || '') }}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
           {/* Payments */}
           <div className="mb-4">

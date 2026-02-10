@@ -29,7 +29,7 @@ const handler = NextAuth({
       if (session.user?.email) {
         const email = session.user.email
         // Cole and Rick are admins, everyone else is salesperson
-        const adminEmails = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com']
+        const adminEmails = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
         session.user.role = adminEmails.includes(email) ? 'admin' : 'salesperson'
         session.user.name = session.user.name || email.split('@')[0]
       }
