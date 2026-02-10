@@ -60,6 +60,19 @@ export async function getDeals(): Promise<(Deal & { collected: number; payments:
   })
 }
 
+// Find deal by patient name and clinic (for sync)
+export async function findDeal(patientName: string, clinic: string): Promise<Deal | null> {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .ilike('patient_name', patientName)
+    .eq('clinic', clinic)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
+  return data
+}
+
 // Create a deal
 export async function createDeal(deal: Omit<Deal, 'id' | 'created_at' | 'updated_at'>): Promise<Deal> {
   const { data, error } = await supabase
