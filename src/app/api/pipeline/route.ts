@@ -105,23 +105,35 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
   }
   
   try {
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-        },
-      }
-    )
+    // Fetch both open and won opportunities
+    const [openRes, wonRes] = await Promise.all([
+      fetch(
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Version': '2021-07-28',
+          },
+        }
+      ),
+      fetch(
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Version': '2021-07-28',
+          },
+        }
+      ),
+    ])
     
-    if (!response.ok) {
-      console.error(`GHL API error for ${clinic}: ${response.status}`)
+    if (!openRes.ok || !wonRes.ok) {
+      console.error(`GHL API error for ${clinic}: open=${openRes.status}, won=${wonRes.status}`)
       return []
     }
     
-    const data = await response.json()
-    return data.opportunities || []
+    const [openData, wonData] = await Promise.all([openRes.json(), wonRes.json()])
+    return [...(openData.opportunities || []), ...(wonData.opportunities || [])]
   } catch (error) {
     console.error(`Failed to fetch GHL opportunities for ${clinic}:`, error)
     return []
