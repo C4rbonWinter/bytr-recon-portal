@@ -137,17 +137,17 @@ function StageColumn({
 }
 
 interface PipelineKanbanProps {
-  salespersonId?: string  // If set, filters to this salesperson only
+  salespersonIds?: string[]  // If set, filters to these salesperson IDs (across GHL instances)
   isAdmin?: boolean
 }
 
-export function PipelineKanban({ salespersonId, isAdmin = true }: PipelineKanbanProps) {
+export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanbanProps) {
   const [data, setData] = useState<PipelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
   const [clinicFilter, setClinicFilter] = useState<string>('')
-  const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonId || '')
+  const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
 
   const fetchPipeline = async () => {
     try {
@@ -170,12 +170,12 @@ export function PipelineKanban({ salespersonId, isAdmin = true }: PipelineKanban
     }
   }
 
-  // Update filter when salespersonId prop changes
+  // Update filter when salespersonIds prop changes
   useEffect(() => {
-    if (salespersonId) {
-      setSalespersonFilter(salespersonId)
+    if (salespersonIds && salespersonIds.length > 0) {
+      setSalespersonFilter(salespersonIds.join(','))
     }
-  }, [salespersonId])
+  }, [salespersonIds])
   
   useEffect(() => {
     fetchPipeline()

@@ -91,7 +91,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const clinicFilter = searchParams.get('clinic') // TR01, TR02, TR04, or null for all
-    const salespersonFilter = searchParams.get('salesperson') // GHL user ID or null for all
+    const salespersonFilter = searchParams.get('salesperson') // GHL user ID(s), comma-separated, or null for all
+    const salespersonIds = salespersonFilter ? salespersonFilter.split(',') : null
     
     const clinicsToFetch = clinicFilter 
       ? [clinicFilter as keyof typeof CLINIC_CONFIG]
@@ -115,8 +116,8 @@ export async function GET(request: NextRequest) {
         // Skip if not in our pipeline stages
         if (!superStage) continue
         
-        // Skip if salesperson filter is set and doesn't match
-        if (salespersonFilter && opp.assignedTo !== salespersonFilter) continue
+        // Skip if salesperson filter is set and doesn't match any of the IDs
+        if (salespersonIds && !salespersonIds.includes(opp.assignedTo)) continue
         
         cards.push({
           id: opp.id,

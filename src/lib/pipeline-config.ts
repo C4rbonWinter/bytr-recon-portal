@@ -104,15 +104,33 @@ export const CLINIC_CONFIG = {
 } as const
 
 // GHL User ID → Salesperson Name mapping
-// TODO: Get full mapping from Cole
+// Two GHL instances: Sales Jet (SG + Irvine) and Teeth+Robots (Vegas)
 export const GHL_USER_MAPPING: Record<string, string> = {
-  // San Gabriel users
-  'MIiKkoPZmR9h4ueKFjoY': 'User 1',
-  'DRr7a8bJ3SYfc7Uaonle': 'User 2',
-  'W02cGzjo8DOEvq3EnNH5': 'User 3',
-  'dIYBT07Gjs2KnrHqSWiH': 'User 4',
-  'xGHzefX0G70ObVhtULtS': 'User 5',
-  // Add more as we discover them
+  // Sales Jet instance (TR01 SG + TR02 Irvine)
+  'xGHzefX0G70ObVhtULtS': 'Josh',
+  'W02cGzjo8DOEvq3EnNH5': 'Chris',
+  '40OKojJlHK1QGWxobiFB': 'Molly',
+  'R2lQOlnfA2u3ozRUIA5a': 'Scot',
+  'dIYBT07Gjs2KnrHqSWiH': 'Jake',
+  'DRr7a8bJ3SYfc7Uaonle': 'Blake',
+  
+  // Teeth+Robots instance (TR04 Vegas)
+  'cnHNqiEGjpOOWVzsZnJe': 'Josh',
+  'MH14SnZ7liJIMIBd2mge': 'Chris',
+  'OYwn6OtVac85ljn26qle': 'Molly',
+  'qdkCS02nCbZhGmn0R8zE': 'Scot',
+  '1pShLvH7qVgRjaMVp80p': 'Jake',
+  'drbfnr6OcLkSfSSxgev0': 'Blake',
+}
+
+// Salesperson name → all their GHL user IDs (for filtering across instances)
+export const SALESPERSON_IDS: Record<string, string[]> = {
+  'Josh': ['xGHzefX0G70ObVhtULtS', 'cnHNqiEGjpOOWVzsZnJe'],
+  'Chris': ['W02cGzjo8DOEvq3EnNH5', 'MH14SnZ7liJIMIBd2mge'],
+  'Molly': ['40OKojJlHK1QGWxobiFB', 'OYwn6OtVac85ljn26qle'],
+  'Scot': ['R2lQOlnfA2u3ozRUIA5a', 'qdkCS02nCbZhGmn0R8zE'],
+  'Jake': ['dIYBT07Gjs2KnrHqSWiH', '1pShLvH7qVgRjaMVp80p'],
+  'Blake': ['DRr7a8bJ3SYfc7Uaonle', 'drbfnr6OcLkSfSSxgev0'],
 }
 
 export function getSalespersonName(ghlUserId: string | null): string {

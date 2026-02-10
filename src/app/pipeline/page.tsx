@@ -6,13 +6,15 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import Link from 'next/link'
 
 // Simulated users for "View As" feature
+// Each salesperson has multiple GHL user IDs (one per GHL instance)
 const USERS = [
-  { id: 'admin', name: 'Cole', role: 'Admin', ghlUserId: null },
-  { id: 'scot', name: 'Scot', role: 'Salesperson', ghlUserId: 'xGHzefX0G70ObVhtULtS' },
-  { id: 'molly', name: 'Molly', role: 'Salesperson', ghlUserId: 'MIiKkoPZmR9h4ueKFjoY' },
-  { id: 'josh', name: 'Josh', role: 'Salesperson', ghlUserId: 'DRr7a8bJ3SYfc7Uaonle' },
-  { id: 'chris', name: 'Chris', role: 'Salesperson', ghlUserId: 'W02cGzjo8DOEvq3EnNH5' },
-  { id: 'jake', name: 'Jake', role: 'Salesperson', ghlUserId: 'dIYBT07Gjs2KnrHqSWiH' },
+  { id: 'admin', name: 'Cole', role: 'Admin', ghlUserIds: [] },
+  { id: 'josh', name: 'Josh', role: 'Salesperson', ghlUserIds: ['xGHzefX0G70ObVhtULtS', 'cnHNqiEGjpOOWVzsZnJe'] },
+  { id: 'chris', name: 'Chris', role: 'Salesperson', ghlUserIds: ['W02cGzjo8DOEvq3EnNH5', 'MH14SnZ7liJIMIBd2mge'] },
+  { id: 'molly', name: 'Molly', role: 'Salesperson', ghlUserIds: ['40OKojJlHK1QGWxobiFB', 'OYwn6OtVac85ljn26qle'] },
+  { id: 'scot', name: 'Scot', role: 'Salesperson', ghlUserIds: ['R2lQOlnfA2u3ozRUIA5a', 'qdkCS02nCbZhGmn0R8zE'] },
+  { id: 'jake', name: 'Jake', role: 'Salesperson', ghlUserIds: ['dIYBT07Gjs2KnrHqSWiH', '1pShLvH7qVgRjaMVp80p'] },
+  { id: 'blake', name: 'Blake', role: 'Salesperson', ghlUserIds: ['DRr7a8bJ3SYfc7Uaonle', 'drbfnr6OcLkSfSSxgev0'] },
 ]
 
 export default function PipelinePage() {
@@ -75,7 +77,7 @@ export default function PipelinePage() {
           </div>
         )}
         <PipelineKanban 
-          salespersonId={isAdmin ? undefined : currentUser.ghlUserId || undefined}
+          salespersonIds={isAdmin ? undefined : currentUser.ghlUserIds}
           isAdmin={isAdmin}
         />
       </main>
