@@ -194,7 +194,6 @@ export async function GET(request: NextRequest) {
     
     // Group by stage
     const pipeline: Record<SuperStage, PipelineCard[]> = {
-      leads: [],
       virtual: [],
       in_person: [],
       tx_plan: [],

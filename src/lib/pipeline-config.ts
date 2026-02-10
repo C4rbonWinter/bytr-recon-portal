@@ -1,28 +1,21 @@
 // Pipeline Stage Configuration
 // Maps GHL stage IDs to our simplified super stages
 
-export const SUPER_STAGES = ['leads', 'virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won'] as const
+export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won'] as const
 export type SuperStage = typeof SUPER_STAGES[number]
 
 export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; order: number }> = {
-  leads: { name: 'Leads', color: 'bg-slate-100 dark:bg-slate-800', order: 0 },
-  virtual: { name: 'Virtual', color: 'bg-blue-100 dark:bg-blue-900/30', order: 1 },
-  in_person: { name: 'In-Person', color: 'bg-purple-100 dark:bg-purple-900/30', order: 2 },
-  tx_plan: { name: 'TX Plan', color: 'bg-amber-100 dark:bg-amber-900/30', order: 3 },
-  closing: { name: 'Closing', color: 'bg-orange-100 dark:bg-orange-900/30', order: 4 },
-  financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 5 },
-  won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 6 },
+  virtual: { name: 'Virtual', color: 'bg-blue-100 dark:bg-blue-900/30', order: 0 },
+  in_person: { name: 'In-Person', color: 'bg-purple-100 dark:bg-purple-900/30', order: 1 },
+  tx_plan: { name: 'TX Plan', color: 'bg-amber-100 dark:bg-amber-900/30', order: 2 },
+  closing: { name: 'Closing', color: 'bg-orange-100 dark:bg-orange-900/30', order: 3 },
+  financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 4 },
+  won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 5 },
 }
 
 // Stage NAME → Super Stage mapping (works across all clinics)
 // Each clinic has different stage IDs but same names
 export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
-  // Leads
-  'pre-qual': 'leads',
-  'qualified': 'leads',
-  'hotlist': 'leads',
-  'contacted': 'leads',
-  
   // Virtual
   'virtual': 'virtual',
   'virtual consult': 'virtual',
