@@ -71,14 +71,21 @@ function ClinicBadge({ clinic }: { clinic: string }) {
   )
 }
 
-function PipelineCardComponent({ card, onClick }: { card: PipelineCard; onClick: () => void }) {
+function truncateName(name: string, maxLength: number = 24): string {
+  if (name.length <= maxLength) return name
+  return name.slice(0, maxLength) + '...'
+}
+
+function PipelineCardComponent({ card, onClick, showSalesperson }: { card: PipelineCard; onClick: () => void; showSalesperson: boolean }) {
   return (
     <div 
       onClick={onClick}
       className="bg-white dark:bg-zinc-800 rounded-lg p-3 shadow-sm border dark:border-zinc-700 cursor-pointer hover:shadow-md transition-shadow"
     >
       <div className="flex justify-between items-start mb-2">
-        <h4 className="font-medium text-sm dark:text-zinc-100 truncate flex-1">{card.name}</h4>
+        <h4 className="font-medium text-sm dark:text-zinc-100 truncate flex-1" title={card.name}>
+          {truncateName(card.name)}
+        </h4>
         <DaysInStageBadge days={card.daysInStage} />
       </div>
       
@@ -88,8 +95,8 @@ function PipelineCardComponent({ card, onClick }: { card: PipelineCard; onClick:
       </div>
       
       <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400">
-        <span className="truncate">{card.assignedTo}</span>
-        <span className="truncate ml-2">{card.source}</span>
+        {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
+        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.source}</span>
       </div>
     </div>
   )
@@ -99,12 +106,14 @@ function StageColumn({
   stage, 
   cards, 
   totals,
-  onCardClick 
+  onCardClick,
+  showSalesperson 
 }: { 
   stage: SuperStage
   cards: PipelineCard[]
   totals: { count: number; value: number }
   onCardClick: (card: PipelineCard) => void
+  showSalesperson: boolean
 }) {
   const config = STAGE_CONFIG[stage]
   
@@ -123,6 +132,7 @@ function StageColumn({
             key={card.id} 
             card={card} 
             onClick={() => onCardClick(card)}
+            showSalesperson={showSalesperson}
           />
         ))}
         
@@ -253,6 +263,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             cards={data.pipeline[stage]}
             totals={data.totals.byStage[stage]}
             onCardClick={setSelectedCard}
+            showSalesperson={isAdmin}
           />
         ))}
       </div>
