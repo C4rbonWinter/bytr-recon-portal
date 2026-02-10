@@ -3,6 +3,21 @@
     {
       "path": "/api/cron/sync-invoice-values",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/sync-won-deals",
+      "schedule": "0 8 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "x-vercel-protection-bypass",
+          "value": "true"
+        }
+      ]
     }
   ]
 }

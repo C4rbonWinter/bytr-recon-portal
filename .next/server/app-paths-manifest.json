@@ -1,4 +1,13 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js"
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/cron/sync-won-deals/route": "app/api/cron/sync-won-deals/route.js",
+  "/api/cron/sync-invoice-values/route": "app/api/cron/sync-invoice-values/route.js",
+  "/api/deals/route": "app/api/deals/route.js",
+  "/api/ghl/search/route": "app/api/ghl/search/route.js",
+  "/page": "app/page.js",
+  "/pipeline/page": "app/pipeline/page.js",
+  "/api/pipeline/route": "app/api/pipeline/route.js",
+  "/api/payments/route": "app/api/payments/route.js",
+  "/login/page": "app/login/page.js"
 }

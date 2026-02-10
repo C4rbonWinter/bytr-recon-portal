@@ -99,6 +99,7 @@ export default function Dashboard() {
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [monthFilter, setMonthFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState<string>('')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
 
@@ -238,6 +239,7 @@ export default function Dashboard() {
     if (clinicFilter !== 'all' && d.clinic !== clinicFilter) return false
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
     if (monthFilter !== 'all' && d.dealMonth !== monthFilter) return false
+    if (searchQuery && !d.patientName.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
   })
 
@@ -318,6 +320,13 @@ export default function Dashboard() {
 
         {/* Filters */}
         <div className="flex gap-4 mb-4">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search patient..."
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100 w-48"
+          />
           <select
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}

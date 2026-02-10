@@ -200,6 +200,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   const [clinicFilter, setClinicFilter] = useState<string>('')
   const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
   const [sortBy, setSortBy] = useState<SortOption>('days_desc')
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
   const fetchPipeline = async () => {
     try {
@@ -251,6 +252,32 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
 
   if (!data) return null
 
+  // Filter pipeline data by search query (client-side for instant feedback)
+  const filteredPipeline = searchQuery
+    ? Object.fromEntries(
+        Object.entries(data.pipeline).map(([stage, cards]) => [
+          stage,
+          (cards as PipelineCard[]).filter(card => 
+            card.name.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        ])
+      ) as Record<SuperStage, PipelineCard[]>
+    : data.pipeline
+
+  // Recalculate totals based on filtered data
+  const filteredTotals = searchQuery
+    ? {
+        count: Object.values(filteredPipeline).flat().length,
+        value: Object.values(filteredPipeline).flat().reduce((sum, card) => sum + card.value, 0),
+        byStage: Object.fromEntries(
+          Object.entries(filteredPipeline).map(([stage, cards]) => [
+            stage,
+            { count: cards.length, value: cards.reduce((sum, card) => sum + card.value, 0) }
+          ])
+        ) as Record<SuperStage, { count: number; value: number }>
+      }
+    : data.totals
+
   return (
     <div>
       {/* Header */}
@@ -258,11 +285,18 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold dark:text-zinc-100">Pipeline</h2>
           <div className="text-sm text-gray-600 dark:text-zinc-400">
-            {data.totals.count} opportunities • {formatCurrency(data.totals.value)} total value
+            {filteredTotals.count} opportunities • {formatCurrency(filteredTotals.value)} total value
           </div>
         </div>
         
         <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search patient..."
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100 w-40"
+          />
           <select
             value={clinicFilter}
             onChange={(e) => setClinicFilter(e.target.value)}
@@ -312,8 +346,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
           <StageColumn
             key={stage}
             stage={stage}
-            cards={data.pipeline[stage]}
-            totals={data.totals.byStage[stage]}
+            cards={filteredPipeline[stage]}
+            totals={filteredTotals.byStage[stage]}
             onCardClick={setSelectedCard}
             showSalesperson={isAdmin}
             sortBy={sortBy}
