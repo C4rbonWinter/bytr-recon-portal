@@ -104,38 +104,58 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
     return []
   }
   
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Version': '2021-07-28',
+  }
+  
   try {
-    // Fetch both open and won opportunities (GHL max limit is 100)
-    const [openRes, wonRes] = await Promise.all([
+    // Fetch from multiple sources to get full picture:
+    // 1. Recent open opportunities (newest first)
+    // 2. Sales pipeline specifically (has TX Plan, Closing, Signed stages)
+    // 3. Won opportunities
+    const fetchPromises = [
+      // General open, newest first
       fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Version': '2021-07-28',
-          },
-        }
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&order=desc`,
+        { headers }
       ),
+      // Won opportunities
       fetch(
         `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Version': '2021-07-28',
-          },
-        }
+        { headers }
       ),
-    ])
+    ]
     
-    if (!openRes.ok || !wonRes.ok) {
-      console.error(`GHL API error for ${clinic}: open=${openRes.status}, won=${wonRes.status}`)
-      return []
+    // Add sales pipeline query if configured
+    if (config.salesPipelineId) {
+      fetchPromises.push(
+        fetch(
+          `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&pipeline_id=${config.salesPipelineId}`,
+          { headers }
+        )
+      )
     }
     
-    const [openData, wonData] = await Promise.all([openRes.json(), wonRes.json()])
+    const responses = await Promise.all(fetchPromises)
     
-    // Combine and dedupe by opportunity ID
-    const allOpps = [...(openData.opportunities || []), ...(wonData.opportunities || [])]
+    // Check for errors
+    for (const res of responses) {
+      if (!res.ok) {
+        console.error(`GHL API error for ${clinic}: ${res.status}`)
+      }
+    }
+    
+    const dataArrays = await Promise.all(responses.map(r => r.json()))
+    
+    // Combine all opportunities and dedupe by ID
+    const allOpps: GHLOpportunity[] = []
+    for (const data of dataArrays) {
+      if (data.opportunities) {
+        allOpps.push(...data.opportunities)
+      }
+    }
+    
     const seen = new Set<string>()
     return allOpps.filter(opp => {
       if (seen.has(opp.id)) return false

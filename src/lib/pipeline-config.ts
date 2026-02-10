@@ -94,11 +94,26 @@ export function getSuperStageByName(stageName: string): SuperStage | null {
   return STAGE_NAME_TO_SUPER[normalized] || null
 }
 
-// Clinic configs
+// Clinic configs with key pipeline IDs for fetching later-stage deals
 export const CLINIC_CONFIG = {
-  TR01: { locationId: 'cl9YH8PZgv32HEz5pIXT', name: 'San Gabriel', tokenKey: 'ghl-api-sg' },
-  TR02: { locationId: 'DJfIuAH1tTxRRBEufitL', name: 'Irvine', tokenKey: 'ghl-api-irv' },
-  TR04: { locationId: '1isaYfEkvNkyLH3XepI5', name: 'Las Vegas', tokenKey: 'ghl-api-vegas' },
+  TR01: { 
+    locationId: 'cl9YH8PZgv32HEz5pIXT', 
+    name: 'San Gabriel', 
+    tokenKey: 'ghl-api-sg',
+    salesPipelineId: 'PI6UfhZ4zXZn9WsZMPtX',  // "2 Sales Stages" - has TX Plan, Closing, Signed
+  },
+  TR02: { 
+    locationId: 'DJfIuAH1tTxRRBEufitL', 
+    name: 'Irvine', 
+    tokenKey: 'ghl-api-irv',
+    salesPipelineId: '90QnJLnT6TeD8EXF0er5',  // "2 Sales Stages"
+  },
+  TR04: { 
+    locationId: '1isaYfEkvNkyLH3XepI5', 
+    name: 'Las Vegas', 
+    tokenKey: 'ghl-api-vegas',
+    salesPipelineId: 'pMZ709aQj5aN3OgeQebh',  // "2 Sales Stages"
+  },
 } as const
 
 // GHL User ID → Salesperson Name mapping
