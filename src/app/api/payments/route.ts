@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayments, createPayment } from '@/lib/supabase'
+import { getPayments, createPayment, deletePayment } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +41,27 @@ export async function POST(request: NextRequest) {
     console.error('Failed to create payment:', error)
     return NextResponse.json(
       { error: 'Failed to create payment' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Missing payment id' }, { status: 400 })
+    }
+    
+    await deletePayment(id)
+    
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Failed to delete payment:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete payment' },
       { status: 500 }
     )
   }

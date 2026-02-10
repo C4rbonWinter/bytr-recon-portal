@@ -114,6 +114,28 @@ export async function createPayment(payment: Omit<Payment, 'id' | 'created_at' |
   return data
 }
 
+// Delete a payment
+export async function deletePayment(id: string): Promise<void> {
+  // Get the payment first to know the deal_id
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('deal_id')
+    .eq('id', id)
+    .single()
+
+  const { error } = await supabase
+    .from('payments')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+  
+  // Update deal status after deletion
+  if (payment?.deal_id) {
+    await updateDealStatus(payment.deal_id)
+  }
+}
+
 // Update deal status based on payments
 export async function updateDealStatus(dealId: string): Promise<void> {
   const { data: deal } = await supabase

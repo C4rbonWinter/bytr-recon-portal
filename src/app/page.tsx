@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 // Types
 interface Payment {
@@ -157,6 +158,25 @@ export default function Dashboard() {
     }
   }
 
+  const handleDeletePayment = async (dealId: string, paymentId: string) => {
+    if (!confirm('Delete this payment?')) return
+    try {
+      const response = await fetch(`/api/payments?id=${paymentId}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        await fetchDeals()
+        setSelectedDeal(prev => {
+          if (!prev || prev.id !== dealId) return prev
+          return { ...prev, payments: prev.payments.filter(p => p.id !== paymentId) }
+        })
+      }
+    } catch (error) {
+      console.error('Failed to delete payment:', error)
+    }
+  }
+
   const handleCreateDeal = async (dealData: any) => {
     try {
       const response = await fetch('/api/deals', {
@@ -228,22 +248,23 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading deals...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex items-center justify-center">
+        <div className="text-gray-500 dark:text-zinc-400">Loading deals...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white dark:bg-zinc-800 shadow-sm border-b dark:border-zinc-700">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">T+R Reconciliation Portal</h1>
-            {isSalesperson && <p className="text-sm text-gray-500">My Deals</p>}
+            <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">T+R Reconciliation Portal</h1>
+            {isSalesperson && <p className="text-sm text-gray-500 dark:text-zinc-400">My Deals</p>}
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <button
               onClick={() => setShowNewDeal(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
@@ -251,17 +272,19 @@ export default function Dashboard() {
               + New Deal
             </button>
             <div className="relative group">
-              <span className="text-gray-600 cursor-pointer">{currentUser.name} ▼</span>
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border hidden group-hover:block z-20">
-                <div className="px-4 py-2 text-sm text-gray-500 border-b">
-                  {session?.user?.email}
+              <span className="text-gray-600 dark:text-zinc-300 cursor-pointer py-2">{currentUser.name} ▼</span>
+              <div className="absolute right-0 top-full pt-1 w-48 hidden group-hover:block z-20">
+                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg border dark:border-zinc-700">
+                  <div className="px-4 py-2 text-sm text-gray-500 dark:text-zinc-400 border-b dark:border-zinc-700">
+                    {session?.user?.email}
+                  </div>
+                  <button
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg"
+                  >
+                    Sign out
+                  </button>
                 </div>
-                <button
-                  onClick={() => signOut({ callbackUrl: '/login' })}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Sign out
-                </button>
               </div>
             </div>
           </div>
@@ -271,21 +294,21 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalPlanned)}</div>
-            <div className="text-sm text-gray-500">Total Planned</div>
+          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
+            <div className="text-2xl font-bold text-gray-900 dark:text-zinc-100">{formatCurrency(totalPlanned)}</div>
+            <div className="text-sm text-gray-500 dark:text-zinc-400">Total Planned</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalCollected)}</div>
-            <div className="text-sm text-gray-500">Verified Collected</div>
+          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalCollected)}</div>
+            <div className="text-sm text-gray-500 dark:text-zinc-400">Verified Collected</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="text-2xl font-bold text-orange-500">{formatCurrency(totalPending)}</div>
-            <div className="text-sm text-gray-500">Pending Balance</div>
+          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
+            <div className="text-2xl font-bold text-orange-500 dark:text-orange-400">{formatCurrency(totalPending)}</div>
+            <div className="text-sm text-gray-500 dark:text-zinc-400">Pending Balance</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="text-2xl font-bold text-red-500">{flaggedCount}</div>
-            <div className="text-sm text-gray-500">Need Attention</div>
+          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
+            <div className="text-2xl font-bold text-red-500 dark:text-red-400">{flaggedCount}</div>
+            <div className="text-sm text-gray-500 dark:text-zinc-400">Need Attention</div>
           </div>
         </div>
 
@@ -294,7 +317,7 @@ export default function Dashboard() {
           <select
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="all">All Months</option>
             {availableMonths.map(month => {
@@ -310,7 +333,7 @@ export default function Dashboard() {
           <select
             value={clinicFilter}
             onChange={(e) => setClinicFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="all">All Clinics</option>
             <option value="TR01">TR01 (SG)</option>
@@ -320,7 +343,7 @@ export default function Dashboard() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 bg-white"
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="all">All Status</option>
             <option value="verified">✅ Verified</option>
@@ -331,23 +354,23 @@ export default function Dashboard() {
         </div>
 
         {/* Deals Table */}
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border dark:border-zinc-700 overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50 dark:bg-zinc-900 border-b dark:border-zinc-700">
               <tr>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Patient</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Clinic</th>
-                {!isSalesperson && <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Salesperson</th>}
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Plan Total</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Collected</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">Balance</th>
-                <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Patient</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Clinic</th>
+                {!isSalesperson && <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Salesperson</th>}
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Plan Total</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Collected</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Balance</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y dark:divide-zinc-700">
               {filteredDeals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={deal.id} className="hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-zinc-100">
                     {deal.patientName}
                     {deal.sharedWith && (
                       <span 
@@ -356,9 +379,9 @@ export default function Dashboard() {
                       >🤝</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{deal.clinic} ({clinicNames[deal.clinic]})</td>
-                  {!isSalesperson && <td className="px-4 py-3 text-gray-600">{deal.salesperson}</td>}
-                  <td className="px-4 py-3 text-left text-gray-900">
+                  <td className="px-4 py-3 text-gray-600 dark:text-zinc-300">{deal.clinic} ({clinicNames[deal.clinic]})</td>
+                  {!isSalesperson && <td className="px-4 py-3 text-gray-600 dark:text-zinc-300">{deal.salesperson}</td>}
+                  <td className="px-4 py-3 text-left text-gray-900 dark:text-zinc-100">
                     {formatCurrency(deal.planTotal)}
                     {deal.invoiceLink && (
                       <a 
@@ -372,12 +395,12 @@ export default function Dashboard() {
                     )}
                   </td>
                   <td 
-                    className="px-4 py-3 text-left text-green-600 cursor-help"
+                    className="px-4 py-3 text-left text-green-600 dark:text-green-400 cursor-help"
                     title={deal.payments.length > 0 ? deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}${!p.verified ? ' (pending)' : ''}`).join('\n') : ''}
                   >
                     {formatCurrency(deal.collected)}
                   </td>
-                  <td className="px-4 py-3 text-left text-orange-500">{formatCurrency(deal.planTotal - deal.collected)}</td>
+                  <td className="px-4 py-3 text-left text-orange-500 dark:text-orange-400">{formatCurrency(deal.planTotal - deal.collected)}</td>
                   <td className="px-4 py-3 text-center text-xl">{statusIcons[deal.status]}</td>
                 </tr>
               ))}
@@ -397,6 +420,7 @@ export default function Dashboard() {
           deal={selectedDeal} 
           onClose={() => setSelectedDeal(null)} 
           onAddPayment={(payment) => handleAddPayment(selectedDeal.id, payment)}
+          onDeletePayment={(paymentId) => handleDeletePayment(selectedDeal.id, paymentId)}
           onUpdateDeal={handleUpdateDeal}
           isSalesperson={isSalesperson}
         />
@@ -648,18 +672,18 @@ function DealDetailModal({
   deal, 
   onClose, 
   onAddPayment,
+  onDeletePayment,
   onUpdateDeal,
   isSalesperson 
 }: { 
   deal: Deal
   onClose: () => void
   onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
+  onDeletePayment: (paymentId: string) => void
   onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => Promise<void>
   isSalesperson: boolean
 }) {
   const [showAddPayment, setShowAddPayment] = useState(false)
-  const [editingShared, setEditingShared] = useState(false)
-  const [editingSalesperson, setEditingSalesperson] = useState(false)
   const [sharedWith, setSharedWith] = useState(deal.sharedWith || '')
   const [salesperson, setSalesperson] = useState(deal.salesperson)
   const [paymentForm, setPaymentForm] = useState({
@@ -668,14 +692,22 @@ function DealDetailModal({
     date: new Date().toISOString().split('T')[0],
   })
 
-  const handleSaveShared = async () => {
-    await onUpdateDeal(deal.id, { sharedWith: sharedWith || null })
-    setEditingShared(false)
-  }
+  // Track if there are unsaved changes
+  const hasChanges = sharedWith !== (deal.sharedWith || '') || salesperson !== deal.salesperson
 
-  const handleSaveSalesperson = async () => {
-    await onUpdateDeal(deal.id, { salesperson })
-    setEditingSalesperson(false)
+  // Smart save on close - check for changes and save them
+  const handleClose = async () => {
+    if (hasChanges) {
+      const changes: { sharedWith?: string | null; salesperson?: string } = {}
+      if (sharedWith !== (deal.sharedWith || '')) {
+        changes.sharedWith = sharedWith || null
+      }
+      if (salesperson !== deal.salesperson) {
+        changes.salesperson = salesperson
+      }
+      await onUpdateDeal(deal.id, changes)
+    }
+    onClose()
   }
 
   const formatCurrency = (amount: number) => {
@@ -749,45 +781,20 @@ function DealDetailModal({
           {!isSalesperson && (
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">
-                  Salesperson: {editingSalesperson ? '' : deal.salesperson}
-                </span>
-                {!editingSalesperson ? (
-                  <button
-                    onClick={() => setEditingSalesperson(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={salesperson}
-                      onChange={(e) => setSalesperson(e.target.value)}
-                      className="border rounded px-2 py-1 text-sm"
-                    >
-                      <option value="Chris">Chris</option>
-                      <option value="Josh">Josh</option>
-                      <option value="Molly">Molly</option>
-                      <option value="Scot">Scot</option>
-                      <option value="Jake">Jake</option>
-                      <option value="Blake">Blake</option>
-                      <option value="TBD">TBD</option>
-                    </select>
-                    <button
-                      onClick={handleSaveSalesperson}
-                      className="text-sm text-green-600 hover:text-green-700"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingSalesperson(false); setSalesperson(deal.salesperson) }}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                <span className="text-sm font-medium text-gray-700">Salesperson:</span>
+                <select
+                  value={salesperson}
+                  onChange={(e) => setSalesperson(e.target.value)}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  <option value="Chris">Chris</option>
+                  <option value="Josh">Josh</option>
+                  <option value="Molly">Molly</option>
+                  <option value="Scot">Scot</option>
+                  <option value="Jake">Jake</option>
+                  <option value="Blake">Blake</option>
+                  <option value="TBD">TBD</option>
+                </select>
               </div>
             </div>
           )}
@@ -795,45 +802,20 @@ function DealDetailModal({
           {/* Shared With */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">
-                  Shared With: {editingShared ? '' : (deal.sharedWith || 'None')}
-                </span>
-                {!editingShared ? (
-                  <button
-                    onClick={() => setEditingShared(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    {deal.sharedWith ? 'Edit' : 'Add'}
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={sharedWith}
-                      onChange={(e) => setSharedWith(e.target.value)}
-                      className="border rounded px-2 py-1 text-sm"
-                    >
-                      <option value="">None</option>
-                      <option value="Chris">Chris</option>
-                      <option value="Josh">Josh</option>
-                      <option value="Molly">Molly</option>
-                      <option value="Scot">Scot</option>
-                      <option value="Jake">Jake</option>
-                      <option value="Blake">Blake</option>
-                    </select>
-                    <button
-                      onClick={handleSaveShared}
-                      className="text-sm text-green-600 hover:text-green-700"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingShared(false); setSharedWith(deal.sharedWith || '') }}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                <span className="text-sm font-medium text-gray-700">Shared With:</span>
+                <select
+                  value={sharedWith}
+                  onChange={(e) => setSharedWith(e.target.value)}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  <option value="">None</option>
+                  <option value="Chris">Chris</option>
+                  <option value="Josh">Josh</option>
+                  <option value="Molly">Molly</option>
+                  <option value="Scot">Scot</option>
+                  <option value="Jake">Jake</option>
+                  <option value="Blake">Blake</option>
+                </select>
               </div>
             </div>
 
@@ -862,9 +844,18 @@ function DealDetailModal({
                         <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Verification</span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
                       {payment.date}
-                      {payment.verified && <span className="ml-2">✅</span>}
+                      {payment.verified && <span>✅</span>}
+                      {!isSalesperson && (
+                        <button
+                          onClick={() => onDeletePayment(payment.id)}
+                          className="text-red-400 hover:text-red-600 ml-2"
+                          title="Delete payment"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -958,10 +949,10 @@ function DealDetailModal({
 
         <div className="p-4 border-t">
           <button
-            onClick={onClose}
-            className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50"
+            onClick={handleClose}
+            className={`w-full px-4 py-2 rounded-lg ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border hover:bg-gray-50'}`}
           >
-            Close
+            {hasChanges ? 'Save' : 'Close'}
           </button>
         </div>
       </div>
