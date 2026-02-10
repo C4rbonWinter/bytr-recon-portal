@@ -105,10 +105,10 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
   }
   
   try {
-    // Fetch both open and won opportunities
+    // Fetch both open and won opportunities (increased limit to 500)
     const [openRes, wonRes] = await Promise.all([
       fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=500`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -117,7 +117,7 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
         }
       ),
       fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=100`,
+        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=500`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -133,7 +133,15 @@ async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promis
     }
     
     const [openData, wonData] = await Promise.all([openRes.json(), wonRes.json()])
-    return [...(openData.opportunities || []), ...(wonData.opportunities || [])]
+    
+    // Combine and dedupe by opportunity ID
+    const allOpps = [...(openData.opportunities || []), ...(wonData.opportunities || [])]
+    const seen = new Set<string>()
+    return allOpps.filter(opp => {
+      if (seen.has(opp.id)) return false
+      seen.add(opp.id)
+      return true
+    })
   } catch (error) {
     console.error(`Failed to fetch GHL opportunities for ${clinic}:`, error)
     return []
