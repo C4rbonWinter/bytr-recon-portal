@@ -259,9 +259,13 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-white dark:bg-zinc-800 shadow-sm border-b dark:border-zinc-700">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">T+R Reconciliation Portal</h1>
-            {isSalesperson && <p className="text-sm text-gray-500 dark:text-zinc-400">My Deals</p>}
+          <div className="flex items-center gap-6">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">T+R Recon Portal</h1>
+            <nav className="flex gap-4">
+              <a href="/" className="text-blue-600 dark:text-blue-400 font-medium">Deals</a>
+              <a href="/pipeline" className="text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100">Pipeline</a>
+            </nav>
+            {isSalesperson && <span className="text-sm text-gray-500 dark:text-zinc-400">My Deals</span>}
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
