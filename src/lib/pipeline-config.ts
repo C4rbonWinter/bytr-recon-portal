@@ -126,7 +126,6 @@ export const GHL_USER_MAPPING: Record<string, string> = {
   'R2lQOlnfA2u3ozRUIA5a': 'Scot',
   'dIYBT07Gjs2KnrHqSWiH': 'Jake',
   'DRr7a8bJ3SYfc7Uaonle': 'Blake',
-  'MIiKkoPZmR9h4ueKFjoY': '(Unknown)',  // TODO: Cole to identify
   
   // Teeth+Robots instance (TR04 Vegas)
   'cnHNqiEGjpOOWVzsZnJe': 'Josh',
@@ -149,5 +148,5 @@ export const SALESPERSON_IDS: Record<string, string[]> = {
 
 export function getSalespersonName(ghlUserId: string | null): string {
   if (!ghlUserId) return 'Unassigned'
-  return GHL_USER_MAPPING[ghlUserId] || ghlUserId.slice(0, 8) + '...'
+  return GHL_USER_MAPPING[ghlUserId] || 'Unknown'
 }
