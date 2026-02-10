@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
+import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, SALESPERSON_IDS } from '@/lib/pipeline-config'
+
+// Static list of salespeople for dropdown (doesn't change based on filtered data)
+const ALL_SALESPEOPLE = Object.entries(SALESPERSON_IDS).map(([name, ids]) => ({
+  name,
+  ids: ids.join(','),
+}))
 
 interface PipelineCard {
   id: string
@@ -239,8 +245,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
               className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
             >
               <option value="">All Salespeople</option>
-              {data?.salespersons?.map(sp => (
-                <option key={sp.id} value={sp.id}>{sp.name}</option>
+              {ALL_SALESPEOPLE.map(sp => (
+                <option key={sp.name} value={sp.ids}>{sp.name}</option>
               ))}
             </select>
           )}
