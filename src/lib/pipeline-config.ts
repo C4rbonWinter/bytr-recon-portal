@@ -28,6 +28,12 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   'office appt': 'in_person',
   'office show': 'in_person',
   'office consult': 'in_person',
+  'confirmation (day before appt)': 'in_person',
+  'confirmation (2 days out)': 'in_person',
+  'confirmation (4 days out)': 'in_person',
+  'confirmed': 'in_person',
+  'future appointment': 'in_person',
+  'future appointments': 'in_person',
   
   // TX Plan
   'tx plan ready': 'tx_plan',
@@ -45,6 +51,8 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   'pp approved': 'financing',
   'cash patient': 'financing',
   'finance option yes': 'financing',
+  'patient preferred link': 'financing',
+  'eligible': 'financing',
   
   // Won
   'signed': 'won',
