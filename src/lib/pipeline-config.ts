@@ -102,3 +102,20 @@ export const CLINIC_CONFIG = {
   TR02: { locationId: 'DJfIuAH1tTxRRBEufitL', name: 'Irvine', tokenKey: 'ghl-api-irv' },
   TR04: { locationId: '1isaYfEkvNkyLH3XepI5', name: 'Las Vegas', tokenKey: 'ghl-api-vegas' },
 } as const
+
+// GHL User ID → Salesperson Name mapping
+// TODO: Get full mapping from Cole
+export const GHL_USER_MAPPING: Record<string, string> = {
+  // San Gabriel users
+  'MIiKkoPZmR9h4ueKFjoY': 'User 1',
+  'DRr7a8bJ3SYfc7Uaonle': 'User 2',
+  'W02cGzjo8DOEvq3EnNH5': 'User 3',
+  'dIYBT07Gjs2KnrHqSWiH': 'User 4',
+  'xGHzefX0G70ObVhtULtS': 'User 5',
+  // Add more as we discover them
+}
+
+export function getSalespersonName(ghlUserId: string | null): string {
+  if (!ghlUserId) return 'Unassigned'
+  return GHL_USER_MAPPING[ghlUserId] || ghlUserId.slice(0, 8) + '...'
+}

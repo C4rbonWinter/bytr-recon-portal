@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { STAGE_CONFIG, SUPER_STAGES, SuperStage } from '@/lib/pipeline-config'
+import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
 
 interface PipelineCard {
   id: string
@@ -20,6 +20,11 @@ interface PipelineCard {
   createdAt: string
 }
 
+interface Salesperson {
+  id: string
+  name: string
+}
+
 interface PipelineData {
   pipeline: Record<SuperStage, PipelineCard[]>
   totals: {
@@ -27,6 +32,7 @@ interface PipelineData {
     value: number
     byStage: Record<SuperStage, { count: number; value: number }>
   }
+  salespersons: Salesperson[]
 }
 
 function formatCurrency(amount: number): string {
@@ -81,8 +87,9 @@ function PipelineCardComponent({ card, onClick }: { card: PipelineCard; onClick:
         <ClinicBadge clinic={card.clinic} />
       </div>
       
-      <div className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-        {card.source}
+      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-zinc-400">
+        <span className="truncate">{card.assignedTo}</span>
+        <span className="truncate ml-2">{card.source}</span>
       </div>
     </div>
   )
@@ -135,13 +142,15 @@ export function PipelineKanban() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
   const [clinicFilter, setClinicFilter] = useState<string>('')
+  const [salespersonFilter, setSalespersonFilter] = useState<string>('')
 
   const fetchPipeline = async () => {
     try {
       setLoading(true)
-      const url = clinicFilter 
-        ? `/api/pipeline?clinic=${clinicFilter}`
-        : '/api/pipeline'
+      const params = new URLSearchParams()
+      if (clinicFilter) params.set('clinic', clinicFilter)
+      if (salespersonFilter) params.set('salesperson', salespersonFilter)
+      const url = `/api/pipeline${params.toString() ? '?' + params.toString() : ''}`
       const response = await fetch(url)
       
       if (!response.ok) throw new Error('Failed to fetch pipeline')
@@ -158,7 +167,7 @@ export function PipelineKanban() {
 
   useEffect(() => {
     fetchPipeline()
-  }, [clinicFilter])
+  }, [clinicFilter, salespersonFilter])
 
   if (loading) {
     return (
@@ -199,6 +208,17 @@ export function PipelineKanban() {
             <option value="TR01">TR01 (SG)</option>
             <option value="TR02">TR02 (IRV)</option>
             <option value="TR04">TR04 (LV)</option>
+          </select>
+          
+          <select
+            value={salespersonFilter}
+            onChange={(e) => setSalespersonFilter(e.target.value)}
+            className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
+          >
+            <option value="">All Salespeople</option>
+            {data?.salespersons?.map(sp => (
+              <option key={sp.id} value={sp.id}>{sp.name}</option>
+            ))}
           </select>
           
           <button

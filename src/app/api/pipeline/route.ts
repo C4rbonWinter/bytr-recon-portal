@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSuperStage, CLINIC_CONFIG, SUPER_STAGES, SuperStage } from '@/lib/pipeline-config'
+import { getSuperStage, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
 
 // GHL API tokens (in production, these would be env vars)
 const GHL_TOKENS: Record<string, string> = {
@@ -36,7 +36,8 @@ interface PipelineCard {
   clinic: string
   stage: SuperStage
   ghlStageId: string
-  assignedTo: string
+  assignedToId: string | null
+  assignedTo: string  // Display name
   source: string
   daysInStage: number
   contactId: string
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const clinicFilter = searchParams.get('clinic') // TR01, TR02, TR04, or null for all
+    const salespersonFilter = searchParams.get('salesperson') // GHL user ID or null for all
     
     const clinicsToFetch = clinicFilter 
       ? [clinicFilter as keyof typeof CLINIC_CONFIG]
@@ -113,6 +115,9 @@ export async function GET(request: NextRequest) {
         // Skip if not in our pipeline stages
         if (!superStage) continue
         
+        // Skip if salesperson filter is set and doesn't match
+        if (salespersonFilter && opp.assignedTo !== salespersonFilter) continue
+        
         cards.push({
           id: opp.id,
           name: opp.name,
@@ -120,7 +125,8 @@ export async function GET(request: NextRequest) {
           clinic: opp.clinic,
           stage: superStage,
           ghlStageId: opp.pipelineStageId,
-          assignedTo: opp.assignedTo || 'Unassigned',
+          assignedToId: opp.assignedTo || null,
+          assignedTo: getSalespersonName(opp.assignedTo),
           source: opp.source || 'Unknown',
           daysInStage: calculateDaysInStage(opp.lastStageChangeAt),
           contactId: opp.contactId,
@@ -167,7 +173,12 @@ export async function GET(request: NextRequest) {
       ),
     }
     
-    return NextResponse.json({ pipeline, totals })
+    // Get unique salespersons for filter dropdown
+    const salespersons = Array.from(new Set(cards.map(c => c.assignedToId).filter(Boolean)))
+      .map(id => ({ id, name: getSalespersonName(id as string) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    
+    return NextResponse.json({ pipeline, totals, salespersons })
   } catch (error) {
     console.error('Pipeline API error:', error)
     return NextResponse.json({ error: 'Failed to fetch pipeline' }, { status: 500 })
