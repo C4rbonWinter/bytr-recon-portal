@@ -7,10 +7,12 @@ import Link from 'next/link'
 
 // Simulated users for "View As" feature
 // Each salesperson has multiple GHL user IDs (one per GHL instance)
+// role: 'Admin' = sees all opportunities + salesperson names on cards
+// role: 'Salesperson' = sees only their opportunities, no SP name on cards
 const USERS = [
   { id: 'admin', name: 'Cole', role: 'Admin', ghlUserIds: [] },
-  { id: 'josh', name: 'Josh', role: 'Salesperson', ghlUserIds: ['xGHzefX0G70ObVhtULtS', 'cnHNqiEGjpOOWVzsZnJe'] },
-  { id: 'chris', name: 'Chris', role: 'Salesperson', ghlUserIds: ['W02cGzjo8DOEvq3EnNH5', 'MH14SnZ7liJIMIBd2mge'] },
+  { id: 'josh', name: 'Josh', role: 'Admin', ghlUserIds: [] },
+  { id: 'chris', name: 'Chris', role: 'Admin', ghlUserIds: [] },
   { id: 'molly', name: 'Molly', role: 'Salesperson', ghlUserIds: ['40OKojJlHK1QGWxobiFB', 'OYwn6OtVac85ljn26qle'] },
   { id: 'scot', name: 'Scot', role: 'Salesperson', ghlUserIds: ['R2lQOlnfA2u3ozRUIA5a', 'qdkCS02nCbZhGmn0R8zE'] },
   { id: 'jake', name: 'Jake', role: 'Salesperson', ghlUserIds: ['dIYBT07Gjs2KnrHqSWiH', '1pShLvH7qVgRjaMVp80p'] },
@@ -59,7 +61,7 @@ export default function PipelinePage() {
                 >
                   {USERS.map(user => (
                     <option key={user.id} value={user.id}>
-                      {user.name} ({user.role})
+                      {user.name}
                     </option>
                   ))}
                 </select>
