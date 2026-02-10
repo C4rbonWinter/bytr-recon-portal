@@ -136,13 +136,18 @@ function StageColumn({
   )
 }
 
-export function PipelineKanban() {
+interface PipelineKanbanProps {
+  salespersonId?: string  // If set, filters to this salesperson only
+  isAdmin?: boolean
+}
+
+export function PipelineKanban({ salespersonId, isAdmin = true }: PipelineKanbanProps) {
   const [data, setData] = useState<PipelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
   const [clinicFilter, setClinicFilter] = useState<string>('')
-  const [salespersonFilter, setSalespersonFilter] = useState<string>('')
+  const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonId || '')
 
   const fetchPipeline = async () => {
     try {
@@ -165,6 +170,13 @@ export function PipelineKanban() {
     }
   }
 
+  // Update filter when salespersonId prop changes
+  useEffect(() => {
+    if (salespersonId) {
+      setSalespersonFilter(salespersonId)
+    }
+  }, [salespersonId])
+  
   useEffect(() => {
     fetchPipeline()
   }, [clinicFilter, salespersonFilter])
@@ -210,16 +222,18 @@ export function PipelineKanban() {
             <option value="TR04">TR04 (LV)</option>
           </select>
           
-          <select
-            value={salespersonFilter}
-            onChange={(e) => setSalespersonFilter(e.target.value)}
-            className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            <option value="">All Salespeople</option>
-            {data?.salespersons?.map(sp => (
-              <option key={sp.id} value={sp.id}>{sp.name}</option>
-            ))}
-          </select>
+          {isAdmin && (
+            <select
+              value={salespersonFilter}
+              onChange={(e) => setSalespersonFilter(e.target.value)}
+              className="border dark:border-zinc-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="">All Salespeople</option>
+              {data?.salespersons?.map(sp => (
+                <option key={sp.id} value={sp.id}>{sp.name}</option>
+              ))}
+            </select>
+          )}
           
           <button
             onClick={fetchPipeline}
