@@ -520,21 +520,21 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-lg font-semibold">New Deal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
+          <h2 className="text-lg font-semibold dark:text-zinc-100">New Deal</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Clinic</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Clinic</label>
             <select
               value={formData.clinic}
               onChange={(e) => {
                 setFormData({ ...formData, clinic: e.target.value, patientName: '' })
                 setSearchResults([])
               }}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-zinc-700 dark:text-zinc-100"
               required
             >
               <option value="">Select clinic first...</option>
@@ -544,31 +544,31 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
             </select>
           </div>
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Patient Name</label>
             <input
               type="text"
               value={formData.patientName}
               onChange={(e) => handleNameChange(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-zinc-700 dark:text-zinc-100"
               placeholder={formData.clinic ? "Start typing..." : "Select clinic first"}
               disabled={!formData.clinic}
               required
             />
             {isSearching && (
-              <span className="absolute right-3 top-9 text-gray-400 text-sm">Searching...</span>
+              <span className="absolute right-3 top-9 text-gray-400 dark:text-zinc-500 text-sm">Searching...</span>
             )}
             {showResults && searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-700 border dark:border-zinc-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {searchResults.map((result) => (
                   <button
                     key={result.id}
                     type="button"
                     onClick={() => selectPatient(result)}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b last:border-b-0"
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-zinc-600 border-b dark:border-zinc-600 last:border-b-0 dark:text-zinc-100"
                   >
                     <div className="font-medium">{result.name}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400">
                       {result.invoiceLink && '📋 Has invoice'}
                     </div>
                   </button>
@@ -576,7 +576,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
               </div>
             )}
             {showResults && searchResults.length === 0 && formData.patientName.length >= 2 && !isSearching && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg p-3 text-sm text-gray-500">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-700 border dark:border-zinc-600 rounded-lg shadow-lg p-3 text-sm text-gray-500 dark:text-zinc-400">
                 No patients found in GHL. You can still create a new deal.
               </div>
             )}
@@ -647,17 +647,10 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
               placeholder="Any additional notes..."
             />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
+          <div className="pt-2">
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Create Deal
             </button>
@@ -731,22 +724,22 @@ function DealDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-4 border-b">
+      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
           <div>
-            <h2 className="text-lg font-semibold">{deal.patientName}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
+            <p className="text-sm text-gray-500 dark:text-zinc-400">
               {deal.dealType} • {deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${deal.salesperson}`}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1">
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-lg font-bold">
+            <div className="text-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
+              <div className="text-lg font-bold dark:text-zinc-100">
                 {formatCurrency(deal.planTotal)}
                 {deal.invoiceLink && (
                   <a 
@@ -758,34 +751,34 @@ function DealDetailModal({
                   >📋</a>
                 )}
               </div>
-              <div className="text-xs text-gray-500">Plan Total</div>
+              <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total</div>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg">
-              <div className="text-lg font-bold text-green-600">{formatCurrency(deal.collected)}</div>
-              <div className="text-xs text-gray-500">Collected</div>
+            <div className="text-center p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
+              <div className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(deal.collected)}</div>
+              <div className="text-xs text-gray-500 dark:text-zinc-400">Collected</div>
             </div>
-            <div className="text-center p-3 bg-orange-50 rounded-lg">
-              <div className="text-lg font-bold text-orange-500">{formatCurrency(balance)}</div>
-              <div className="text-xs text-gray-500">Balance</div>
+            <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
+              <div className="text-lg font-bold text-orange-500 dark:text-orange-400">{formatCurrency(balance)}</div>
+              <div className="text-xs text-gray-500 dark:text-zinc-400">Balance</div>
             </div>
           </div>
 
           {/* Notes */}
           {deal.notes && (
-            <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
-              <p className="text-sm text-gray-700">{deal.notes}</p>
+            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <p className="text-sm text-gray-700 dark:text-zinc-300">{deal.notes}</p>
             </div>
           )}
 
           {/* Salesperson (admin only) */}
           {!isSalesperson && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Salesperson:</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Salesperson:</span>
                 <select
                   value={salesperson}
                   onChange={(e) => setSalesperson(e.target.value)}
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-zinc-600 dark:text-zinc-100"
                 >
                   <option value="Chris">Chris</option>
                   <option value="Josh">Josh</option>
@@ -800,13 +793,13 @@ function DealDetailModal({
           )}
 
           {/* Shared With */}
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="mb-4 p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Shared With:</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Shared With:</span>
                 <select
                   value={sharedWith}
                   onChange={(e) => setSharedWith(e.target.value)}
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-zinc-600 dark:text-zinc-100"
                 >
                   <option value="">None</option>
                   <option value="Chris">Chris</option>
@@ -822,29 +815,29 @@ function DealDetailModal({
           {/* Payments */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-medium">Payments</h3>
+              <h3 className="font-medium dark:text-zinc-100">Payments</h3>
               <button
                 onClick={() => setShowAddPayment(true)}
-                className="text-sm text-blue-600 hover:text-blue-700"
+                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
               >
                 + Add Payment
               </button>
             </div>
 
             {deal.payments.length === 0 ? (
-              <p className="text-gray-400 text-sm italic">No payments recorded</p>
+              <p className="text-gray-400 dark:text-zinc-500 text-sm italic">No payments recorded</p>
             ) : (
               <div className="space-y-2">
                 {deal.payments.map((payment) => (
-                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
                     <div>
-                      <span className="font-medium">{formatCurrency(payment.amount)}</span>
-                      <span className="text-gray-500 text-sm ml-2">{payment.method}</span>
+                      <span className="font-medium dark:text-zinc-100">{formatCurrency(payment.amount)}</span>
+                      <span className="text-gray-500 dark:text-zinc-400 text-sm ml-2">{payment.method}</span>
                       {payment.method === 'Cash' && !payment.verified && (
-                        <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Verification</span>
+                        <span className="ml-2 text-xs bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded">Pending Verification</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
                       {payment.date}
                       {payment.verified && <span>✅</span>}
                       {!isSalesperson && (
@@ -865,40 +858,40 @@ function DealDetailModal({
 
           {/* Add Payment Form */}
           {showAddPayment && (
-            <form onSubmit={handleAddPayment} className="p-4 bg-blue-50 rounded-lg space-y-3">
-              <h4 className="font-medium text-sm">Add Payment</h4>
+            <form onSubmit={handleAddPayment} className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg space-y-3">
+              <h4 className="font-medium text-sm dark:text-zinc-100">Add Payment</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Amount</label>
+                  <label className="block text-xs text-gray-600 dark:text-zinc-400 mb-1">Amount</label>
                   <div className="relative">
-                    <span className="absolute left-2 top-2 text-gray-500 text-sm">$</span>
+                    <span className="absolute left-2 top-2 text-gray-500 dark:text-zinc-400 text-sm">$</span>
                     <input
                       type="number"
                       value={paymentForm.amount}
                       onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                      className="w-full border rounded px-2 py-1.5 pl-5 text-sm"
+                      className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 pl-5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
                       placeholder="0"
                       required
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <label className="block text-xs text-gray-600 dark:text-zinc-400 mb-1">Date</label>
                   <input
                     type="date"
                     value={paymentForm.date}
                     onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
-                    className="w-full border rounded px-2 py-1.5 text-sm"
+                    className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
                     required
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Method</label>
+                <label className="block text-xs text-gray-600 dark:text-zinc-400 mb-1">Method</label>
                 <select
                   value={paymentForm.method}
                   onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value as Payment['method'] })}
-                  className="w-full border rounded px-2 py-1.5 text-sm"
+                  className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
                   required
                 >
                   <option value="">Select method...</option>
@@ -924,7 +917,7 @@ function DealDetailModal({
                 </select>
               </div>
               {paymentForm.method === 'Cash' && (
-                <p className="text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
+                <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded">
                   ⚠️ Cash payments require admin verification
                 </p>
               )}
@@ -932,7 +925,7 @@ function DealDetailModal({
                 <button
                   type="button"
                   onClick={() => setShowAddPayment(false)}
-                  className="flex-1 px-3 py-1.5 border rounded text-sm hover:bg-gray-50"
+                  className="flex-1 px-3 py-1.5 border dark:border-zinc-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-zinc-600 dark:text-zinc-100"
                 >
                   Cancel
                 </button>
@@ -947,10 +940,10 @@ function DealDetailModal({
           )}
         </div>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t dark:border-zinc-700">
           <button
             onClick={handleClose}
-            className={`w-full px-4 py-2 rounded-lg ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border hover:bg-gray-50'}`}
+            className={`w-full px-4 py-2 rounded-lg ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700 dark:text-zinc-100'}`}
           >
             {hasChanges ? 'Save' : 'Close'}
           </button>
