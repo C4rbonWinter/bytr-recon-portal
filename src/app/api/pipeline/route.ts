@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSuperStage, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
+import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
 
 // GHL API tokens (in production, these would be env vars)
 const GHL_TOKENS: Record<string, string> = {
@@ -45,6 +45,54 @@ interface PipelineCard {
   phone?: string
   tags: string[]
   createdAt: string
+}
+
+interface GHLStage {
+  id: string
+  name: string
+}
+
+// Cache for stage ID → name mappings per clinic
+const stageNameCache: Record<string, Record<string, string>> = {}
+
+async function fetchStageNames(clinic: keyof typeof CLINIC_CONFIG): Promise<Record<string, string>> {
+  if (stageNameCache[clinic]) {
+    return stageNameCache[clinic]
+  }
+  
+  const config = CLINIC_CONFIG[clinic]
+  const token = GHL_TOKENS[clinic]
+  
+  if (!token) return {}
+  
+  try {
+    const response = await fetch(
+      `https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${config.locationId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+        },
+      }
+    )
+    
+    if (!response.ok) return {}
+    
+    const data = await response.json()
+    const mapping: Record<string, string> = {}
+    
+    for (const pipeline of data.pipelines || []) {
+      for (const stage of pipeline.stages || []) {
+        mapping[stage.id] = stage.name
+      }
+    }
+    
+    stageNameCache[clinic] = mapping
+    return mapping
+  } catch (error) {
+    console.error(`Failed to fetch stages for ${clinic}:`, error)
+    return {}
+  }
 }
 
 async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promise<GHLOpportunity[]> {
@@ -98,20 +146,25 @@ export async function GET(request: NextRequest) {
       ? [clinicFilter as keyof typeof CLINIC_CONFIG]
       : ['TR01', 'TR02', 'TR04'] as const
     
-    // Fetch opportunities from all clinics in parallel
-    const allOpportunities = await Promise.all(
+    // Fetch opportunities and stage names from all clinics in parallel
+    const allData = await Promise.all(
       clinicsToFetch.map(async (clinic) => {
-        const opps = await fetchGHLOpportunities(clinic)
-        return opps.map(opp => ({ ...opp, clinic }))
+        const [opps, stageNames] = await Promise.all([
+          fetchGHLOpportunities(clinic),
+          fetchStageNames(clinic),
+        ])
+        return { clinic, opps, stageNames }
       })
     )
     
     // Flatten and transform to pipeline cards
     const cards: PipelineCard[] = []
     
-    for (const clinicOpps of allOpportunities) {
-      for (const opp of clinicOpps) {
-        const superStage = getSuperStage(opp.pipelineStageId)
+    for (const { clinic, opps, stageNames } of allData) {
+      for (const opp of opps) {
+        // Get stage name from ID, then map to super stage
+        const stageName = stageNames[opp.pipelineStageId] || ''
+        const superStage = getSuperStageByName(stageName)
         
         // Skip if not in our pipeline stages
         if (!superStage) continue
@@ -123,7 +176,7 @@ export async function GET(request: NextRequest) {
           id: opp.id,
           name: opp.name,
           value: opp.monetaryValue || 0,
-          clinic: opp.clinic,
+          clinic: clinic,
           stage: superStage,
           ghlStageId: opp.pipelineStageId,
           assignedToId: opp.assignedTo || null,
