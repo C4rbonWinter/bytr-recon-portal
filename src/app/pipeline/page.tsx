@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { PipelineKanban } from '@/components/pipeline-kanban'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Logo } from '@/components/logo'
 import Link from 'next/link'
 
 // Simulated users for "View As" feature
@@ -25,56 +26,57 @@ export default function PipelinePage() {
   const isAdmin = currentUser.role === 'Admin'
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-zinc-800 shadow-sm border-b dark:border-zinc-700">
-        <div className="max-w-[1800px] mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-6">
-              <h1 className="text-xl font-bold dark:text-zinc-100">T+R Recon Portal</h1>
-              <nav className="flex gap-4">
-                <Link 
-                  href="/" 
-                  className="text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100"
-                >
-                  Deals
-                </Link>
-                <Link 
-                  href="/pipeline" 
-                  className="text-blue-600 dark:text-blue-400 font-medium"
-                >
-                  Pipeline
-                </Link>
-              </nav>
-            </div>
-            
+      <header className="bg-card border-b border-border">
+        <div className="max-w-[1800px] mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-              <ThemeToggle />
-              
-              {/* View As Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 dark:text-zinc-400">View as:</span>
-                <select
-                  value={currentUser.id}
-                  onChange={(e) => setCurrentUser(USERS.find(u => u.id === e.target.value) || USERS[0])}
-                  className="border dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  {USERS.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Logo className="h-7 w-auto" />
+              <span className="font-semibold text-foreground tracking-tight">Recon</span>
+            </div>
+            <nav className="flex gap-4 ml-4">
+              <Link 
+                href="/" 
+                className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+              >
+                Deals
+              </Link>
+              <Link 
+                href="/pipeline" 
+                className="text-foreground font-medium text-sm"
+              >
+                Pipeline
+              </Link>
+            </nav>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            
+            {/* View As Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">View as:</span>
+              <select
+                value={currentUser.id}
+                onChange={(e) => setCurrentUser(USERS.find(u => u.id === e.target.value) || USERS[0])}
+                className="border border-border rounded-lg px-3 py-1.5 text-sm bg-secondary text-foreground"
+              >
+                {USERS.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1800px] mx-auto px-4 py-6">
+      <main className="max-w-[1800px] mx-auto px-6 py-6">
         {!isAdmin && (
-          <div className="mb-4 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+          <div className="mb-4 px-4 py-2 bg-chart-5/10 rounded-lg text-sm text-chart-5">
             Viewing as <strong>{currentUser.name}</strong> — showing only their assigned opportunities
           </div>
         )}

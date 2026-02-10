@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Logo } from '@/components/logo'
+import { CheckCircle2, AlertCircle, XCircle, Flag } from 'lucide-react'
 
 // Types
 interface Payment {
@@ -69,11 +71,19 @@ const clinicNames: Record<string, string> = {
   TR04: 'LV',
 }
 
-const statusIcons: Record<string, string> = {
-  verified: '✅',
-  partial: '⚠️',
-  unpaid: '🔴',
-  flagged: '🚩',
+const StatusIcon = ({ status }: { status: string }) => {
+  switch (status) {
+    case 'verified':
+      return <CheckCircle2 className="h-5 w-5 text-chart-6" />
+    case 'partial':
+      return <AlertCircle className="h-5 w-5 text-chart-3" />
+    case 'unpaid':
+      return <XCircle className="h-5 w-5 text-destructive" />
+    case 'flagged':
+      return <Flag className="h-5 w-5 text-chart-3" />
+    default:
+      return null
+  }
 }
 
 const methodIcons: Record<string, string> = {
@@ -257,36 +267,39 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-zinc-800 shadow-sm border-b dark:border-zinc-700">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <header className="bg-card border-b border-border">
+        <div className="max-w-[1800px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">T+R Recon Portal</h1>
-            <nav className="flex gap-4">
-              <a href="/" className="text-blue-600 dark:text-blue-400 font-medium">Deals</a>
-              <a href="/pipeline" className="text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100">Pipeline</a>
+            <div className="flex items-center gap-3">
+              <Logo className="h-7 w-auto" />
+              <span className="font-semibold text-foreground tracking-tight">Recon</span>
+            </div>
+            <nav className="flex gap-4 ml-4">
+              <a href="/" className="text-foreground font-medium text-sm">Deals</a>
+              <a href="/pipeline" className="text-muted-foreground hover:text-foreground transition-colors text-sm">Pipeline</a>
             </nav>
-            {isSalesperson && <span className="text-sm text-gray-500 dark:text-zinc-400">My Deals</span>}
+            {isSalesperson && <span className="text-sm text-muted-foreground">My Deals</span>}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <ThemeToggle />
             <button
               onClick={() => setShowNewDeal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+              className="bg-foreground text-background px-4 py-2 rounded-lg hover:bg-foreground/90 transition text-sm font-medium"
             >
               + New Deal
             </button>
             <div className="relative group">
-              <span className="text-gray-600 dark:text-zinc-300 cursor-pointer py-2">{currentUser.name} ▼</span>
+              <span className="text-muted-foreground cursor-pointer py-2 text-sm">{currentUser.name} ▼</span>
               <div className="absolute right-0 top-full pt-1 w-48 hidden group-hover:block z-20">
-                <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg border dark:border-zinc-700">
-                  <div className="px-4 py-2 text-sm text-gray-500 dark:text-zinc-400 border-b dark:border-zinc-700">
+                <div className="bg-card rounded-lg shadow-lg border border-border">
+                  <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border">
                     {session?.user?.email}
                   </div>
                   <button
                     onClick={() => signOut({ callbackUrl: '/login' })}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg"
+                    className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-b-lg"
                   >
                     Sign out
                   </button>
@@ -297,40 +310,40 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-[1800px] mx-auto px-6 py-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
-            <div className="text-2xl font-bold text-gray-900 dark:text-zinc-100">{formatCurrency(totalPlanned)}</div>
-            <div className="text-sm text-gray-500 dark:text-zinc-400">Total Planned</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-primary/20 transition-colors">
+            <div className="text-2xl font-bold text-foreground tracking-tight">{formatCurrency(totalPlanned)}</div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Total Planned</div>
           </div>
-          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalCollected)}</div>
-            <div className="text-sm text-gray-500 dark:text-zinc-400">Verified Collected</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-chart-1/20 transition-colors">
+            <div className="text-2xl font-bold text-chart-1 tracking-tight">{formatCurrency(totalCollected)}</div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Verified Collected</div>
           </div>
-          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
-            <div className="text-2xl font-bold text-orange-500 dark:text-orange-400">{formatCurrency(totalPending)}</div>
-            <div className="text-sm text-gray-500 dark:text-zinc-400">Pending Balance</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-chart-2/20 transition-colors">
+            <div className="text-2xl font-bold text-chart-2 tracking-tight">{formatCurrency(totalPending)}</div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Pending Balance</div>
           </div>
-          <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-sm border dark:border-zinc-700">
-            <div className="text-2xl font-bold text-red-500 dark:text-red-400">{flaggedCount}</div>
-            <div className="text-sm text-gray-500 dark:text-zinc-400">Need Attention</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-destructive/20 transition-colors">
+            <div className="text-2xl font-bold text-destructive tracking-tight">{flaggedCount}</div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Need Attention</div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4 mb-4">
+        <div className="flex gap-3 mb-4">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search patient..."
-            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100 w-48"
+            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground placeholder:text-muted-foreground w-48 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
           />
           <select
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Months</option>
             {availableMonths.map(month => {
@@ -346,7 +359,7 @@ export default function Dashboard() {
           <select
             value={clinicFilter}
             onChange={(e) => setClinicFilter(e.target.value)}
-            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Clinics</option>
             <option value="TR01">TR01 (SG)</option>
@@ -356,45 +369,45 @@ export default function Dashboard() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 dark:text-zinc-100"
+            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Status</option>
-            <option value="verified">✅ Verified</option>
-            <option value="partial">⚠️ Partial</option>
-            <option value="unpaid">🔴 Unpaid</option>
-            <option value="flagged">🚩 Flagged</option>
+            <option value="verified">Verified</option>
+            <option value="partial">Partial</option>
+            <option value="unpaid">Unpaid</option>
+            <option value="flagged">Flagged</option>
           </select>
         </div>
 
         {/* Deals Table */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border dark:border-zinc-700 overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-zinc-900 border-b dark:border-zinc-700">
+            <thead className="bg-secondary border-b border-border">
               <tr>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Patient</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Clinic</th>
-                {!isSalesperson && <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Salesperson</th>}
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Plan Total</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Collected</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Balance</th>
-                <th className="text-center px-4 py-3 text-sm font-medium text-gray-500 dark:text-zinc-400">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Patient</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Clinic</th>
+                {!isSalesperson && <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Salesperson</th>}
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Plan Total</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Collected</th>
+                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Balance</th>
+                <th className="text-center px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y dark:divide-zinc-700">
+            <tbody className="divide-y divide-border">
               {filteredDeals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-zinc-100">
+                <tr key={deal.id} className="hover:bg-secondary/50 cursor-pointer transition-colors" onClick={() => setSelectedDeal(deal)}>
+                  <td className="px-4 py-3 font-medium text-foreground">
                     {deal.patientName}
                     {deal.sharedWith && (
                       <span 
-                        className="ml-2 cursor-help" 
+                        className="ml-2 cursor-help text-chart-5" 
                         title={`Shared with ${deal.sharedWith === currentUser.name ? deal.salesperson : deal.sharedWith}`}
-                      >🤝</span>
+                      >⊕</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-zinc-300">{deal.clinic} ({clinicNames[deal.clinic]})</td>
-                  {!isSalesperson && <td className="px-4 py-3 text-gray-600 dark:text-zinc-300">{deal.salesperson}</td>}
-                  <td className="px-4 py-3 text-left text-gray-900 dark:text-zinc-100">
+                  <td className="px-4 py-3 text-muted-foreground text-sm">{deal.clinic} ({clinicNames[deal.clinic]})</td>
+                  {!isSalesperson && <td className="px-4 py-3 text-muted-foreground text-sm">{deal.salesperson}</td>}
+                  <td className="px-4 py-3 text-left text-foreground">
                     {formatCurrency(deal.planTotal)}
                     {deal.invoiceLink && (
                       <a 
@@ -402,19 +415,19 @@ export default function Dashboard() {
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="ml-1 hover:opacity-70"
+                        className="ml-1.5 text-chart-5 hover:text-chart-5/70 transition-colors"
                         title="View invoice"
-                      >📋</a>
+                      >↗</a>
                     )}
                   </td>
                   <td 
-                    className="px-4 py-3 text-left text-green-600 dark:text-green-400 cursor-help"
+                    className={`px-4 py-3 text-left cursor-help ${deal.collected === 0 ? 'text-foreground font-bold' : 'text-chart-6'}`}
                     title={deal.payments.length > 0 ? deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}${!p.verified ? ' (pending)' : ''}`).join('\n') : ''}
                   >
                     {formatCurrency(deal.collected)}
                   </td>
-                  <td className="px-4 py-3 text-left text-orange-500 dark:text-orange-400">{formatCurrency(deal.planTotal - deal.collected)}</td>
-                  <td className="px-4 py-3 text-center text-xl">{statusIcons[deal.status]}</td>
+                  <td className={`px-4 py-3 text-left ${(deal.planTotal - deal.collected) === 0 ? 'text-chart-6' : 'text-chart-1'}`}>{formatCurrency(deal.planTotal - deal.collected)}</td>
+                  <td className="px-4 py-3 flex justify-center"><StatusIcon status={deal.status} /></td>
                 </tr>
               ))}
             </tbody>

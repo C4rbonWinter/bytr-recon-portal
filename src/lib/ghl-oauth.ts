@@ -208,3 +208,16 @@ export async function updateOpportunityValue(
 ): Promise<{ success: boolean; error?: string }> {
   return updateOpportunity(locationId, opportunityId, { monetaryValue });
 }
+
+// Export location token getter for direct API access
+export async function getLocationToken(
+  companyId: string,
+  locationId: string
+): Promise<{ success: boolean; accessToken?: string; error?: string }> {
+  try {
+    const accessToken = await getLocationAccessToken(locationId);
+    return { success: true, accessToken };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
