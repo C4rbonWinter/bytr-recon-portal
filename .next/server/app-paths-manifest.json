@@ -8,8 +8,8 @@
   "/api/payments/route": "app/api/payments/route.js",
   "/api/pipeline/deal-type/route": "app/api/pipeline/deal-type/route.js",
   "/api/pipeline/move/route": "app/api/pipeline/move/route.js",
-  "/login/page": "app/login/page.js",
   "/api/pipeline/route": "app/api/pipeline/route.js",
+  "/login/page": "app/login/page.js",
   "/api/pipeline/leaderboard/route": "app/api/pipeline/leaderboard/route.js",
   "/(app)/pipeline/page": "app/(app)/pipeline/page.js",
   "/(app)/page": "app/(app)/page.js"

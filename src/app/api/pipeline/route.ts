@@ -22,6 +22,29 @@ function formatDealType(raw: string | null | undefined): string {
   return raw.replace(/\s*Implants?$/i, '').trim()
 }
 
+// Parse deal_month to a start-of-month date (more accurate than created_at which is import time)
+function parseDealMonth(dm: string | null): Date | null {
+  if (!dm) return null
+  // Formats: "Jan 2026", "Dec 2025", "2026-02"
+  const monthNames: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+  }
+  // Try "MMM YYYY" format
+  const match1 = dm.match(/^([A-Za-z]{3})\s+(\d{4})$/)
+  if (match1) {
+    const month = monthNames[match1[1]]
+    const year = parseInt(match1[2])
+    if (month !== undefined) return new Date(year, month, 1)
+  }
+  // Try "YYYY-MM" format
+  const match2 = dm.match(/^(\d{4})-(\d{2})$/)
+  if (match2) {
+    return new Date(parseInt(match2[1]), parseInt(match2[2]) - 1, 1)
+  }
+  return null
+}
+
 interface GHLOpportunity {
   id: string
   name: string
@@ -286,11 +309,11 @@ async function calculateLeaderboard(
       }
     }
     
-    // Fastest Closer = avg time from deal creation to first payment (min 2 deals)
-    // Re-fetch deals with created_at for this calculation
+    // Fastest Closer = avg time from deal start (deal_month) to first payment (min 2 deals)
+    // Use deal_month instead of created_at (which is import timestamp, not actual deal start)
     const { data: dealsWithDates, error: datesError } = await supabase
       .from('deals')
-      .select('id, salesperson, created_at')
+      .select('id, salesperson, deal_month')
     
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
@@ -301,10 +324,10 @@ async function calculateLeaderboard(
     if (paymentsError) console.error('Leaderboard payments query error:', paymentsError)
     
     if (dealsWithDates && dealsWithDates.length > 0 && payments && payments.length > 0) {
-      // Build map of deal_id -> salesperson and created_at
-      const dealInfo: Record<string, { salesperson: string; createdAt: string }> = {}
+      // Build map of deal_id -> salesperson and deal start date (from deal_month)
+      const dealInfo: Record<string, { salesperson: string; startDate: Date | null }> = {}
       for (const deal of dealsWithDates) {
-        dealInfo[deal.id] = { salesperson: deal.salesperson, createdAt: deal.created_at }
+        dealInfo[deal.id] = { salesperson: deal.salesperson, startDate: parseDealMonth(deal.deal_month) }
       }
       
       // Find first payment date per deal
@@ -319,14 +342,13 @@ async function calculateLeaderboard(
       const closeTimesBySP: Record<string, number[]> = {}
       for (const [dealId, paymentDate] of Object.entries(firstPayment)) {
         const info = dealInfo[dealId]
-        if (!info || !info.salesperson || info.salesperson === 'Unassigned' || !info.createdAt) continue
+        if (!info || !info.salesperson || info.salesperson === 'Unassigned' || !info.startDate) continue
         
-        const created = new Date(info.createdAt)
         const paid = new Date(paymentDate)
-        const diffMs = paid.getTime() - created.getTime()
+        const diffMs = paid.getTime() - info.startDate.getTime()
         
-        // Sanity check: positive and less than 1 year
-        if (diffMs > 0 && diffMs < 365 * 24 * 60 * 60 * 1000) {
+        // Sanity check: 0+ days (same month is valid) and less than 1 year
+        if (diffMs >= 0 && diffMs < 365 * 24 * 60 * 60 * 1000) {
           if (!closeTimesBySP[info.salesperson]) closeTimesBySP[info.salesperson] = []
           closeTimesBySP[info.salesperson].push(diffMs)
         }
