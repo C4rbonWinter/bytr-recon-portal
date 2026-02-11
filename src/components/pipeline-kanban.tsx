@@ -14,8 +14,7 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from '@dnd-kit/core'
-import { useSortable } from '@dnd-kit/sortable'
-import { useDroppable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 
 // Static list of salespeople for dropdown (doesn't change based on filtered data)
@@ -167,12 +166,10 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
     listeners,
     setNodeRef,
     transform,
-    transition,
-  } = useSortable({ id: card.id })
+  } = useDraggable({ id: card.id })
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1,
   }
 
