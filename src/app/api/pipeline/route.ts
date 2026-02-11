@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
     const { data: overrides } = await supabase
       .from('stage_overrides')
       .select('opportunity_id, super_stage')
+    
     const stageOverrideMap = new Map<string, SuperStage>(
       (overrides || []).map(o => [o.opportunity_id, o.super_stage as SuperStage])
     )
@@ -225,24 +226,24 @@ async function calculateLeaderboard(supabase: ReturnType<typeof getSupabase>): P
     }
   })
   
-  // Get biggest pipeline from opportunities
+  // Get biggest pipeline from opportunities (count of cards, not value)
   const { data: pipelineOpps } = await supabase
     .from('opportunities')
-    .select('assigned_to_name, monetary_value')
-    .not('super_stage', 'eq', 'won')
+    .select('assigned_to_name')
+    .not('super_stage', 'in', '("won","archive")')
   
-  const pipelineBySalesperson = new Map<string, number>()
+  const pipelineCountBySalesperson = new Map<string, number>()
   for (const opp of pipelineOpps || []) {
     if (opp.assigned_to_name) {
-      const current = pipelineBySalesperson.get(opp.assigned_to_name) || 0
-      pipelineBySalesperson.set(opp.assigned_to_name, current + (opp.monetary_value || 0))
+      const current = pipelineCountBySalesperson.get(opp.assigned_to_name) || 0
+      pipelineCountBySalesperson.set(opp.assigned_to_name, current + 1)
     }
   }
   
   let topPipeline = { name: '-', value: 0 }
-  Array.from(pipelineBySalesperson.entries()).forEach(([name, value]) => {
-    if (value > topPipeline.value) {
-      topPipeline = { name, value }
+  Array.from(pipelineCountBySalesperson.entries()).forEach(([name, count]) => {
+    if (count > topPipeline.value) {
+      topPipeline = { name, value: count }
     }
   })
   
@@ -322,7 +323,7 @@ async function calculateLeaderboard(supabase: ReturnType<typeof getSupabase>): P
     },
     biggestPipeline: {
       ...topPipeline,
-      displayValue: formatCurrency(topPipeline.value),
+      displayValue: topPipeline.value.toString(),
     },
     fastestCloser,
   }

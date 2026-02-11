@@ -164,59 +164,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Get pipeline data from GHL for biggest pipeline
-    // Fetch OPEN opportunities (active pipeline, not won/lost)
-    const pipelineByPerson: Record<string, number> = {}
+    // 2. Get pipeline data from Supabase for biggest pipeline
+    // Count OPEN opportunities (cards) per salesperson
+    const pipelineCountByPerson: Record<string, number> = {}
     
-    for (const clinic of ['TR01', 'TR02', 'TR04'] as const) {
-      const token = getGHLToken(clinic)
-      if (!token) {
-        console.log(`Leaderboard: No GHL token for ${clinic}`)
-        continue
-      }
-      
-      const config = CLINIC_CONFIG[clinic]
-      
-      try {
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-        }
+    const { data: pipelineOpps, error: pipelineError } = await supabase
+      .from('opportunities')
+      .select('assigned_to_name')
+      .not('super_stage', 'in', '("won","archive")')
+    
+    if (pipelineError) {
+      console.error('Pipeline opportunities error:', pipelineError)
+    } else {
+      for (const opp of pipelineOpps || []) {
+        const sp = opp.assigned_to_name || 'Unassigned'
+        if (sp === 'Unassigned') continue
         
-        // Fetch from sales pipeline specifically (has TX Plan, Closing, Signed with actual values)
-        // This matches what the main pipeline route does
-        const salesPipelineId = config.salesPipelineId
-        if (!salesPipelineId) {
-          console.log(`Leaderboard: No salesPipelineId for ${clinic}`)
-          continue
-        }
-        
-        const response = await fetch(
-          `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&pipeline_id=${salesPipelineId}`,
-          { headers }
-        )
-        
-        if (!response.ok) {
-          console.error(`Leaderboard: GHL API error for ${clinic}: ${response.status}`)
-          continue
-        }
-        
-        const data = await response.json()
-        console.log(`Leaderboard: ${clinic} returned ${data.opportunities?.length || 0} opportunities from sales pipeline`)
-        
-        for (const opp of data.opportunities || []) {
-          const sp = getSalespersonName(opp.assignedTo)
-          if (sp === 'Unassigned') continue
-          
-          if (!pipelineByPerson[sp]) pipelineByPerson[sp] = 0
-          pipelineByPerson[sp] += opp.monetaryValue || 0
-        }
-      } catch (err) {
-        console.error(`Leaderboard: Failed to fetch pipeline for ${clinic}:`, err)
+        if (!pipelineCountByPerson[sp]) pipelineCountByPerson[sp] = 0
+        pipelineCountByPerson[sp]++
       }
     }
     
-    console.log('Leaderboard: pipelineByPerson =', pipelineByPerson)
+    console.log('Leaderboard: pipelineCountByPerson =', pipelineCountByPerson)
 
     // 3. Find leaders for each category
     const formatCurrency = (n: number) => 
@@ -238,11 +207,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Biggest Pipeline leader
-    let pipelineLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '$0' }
-    for (const [name, value] of Object.entries(pipelineByPerson)) {
-      if (value > pipelineLeader.value) {
-        pipelineLeader = { name, value, displayValue: formatCurrency(value) }
+    // Biggest Pipeline leader (by card count, not value)
+    let pipelineLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
+    for (const [name, count] of Object.entries(pipelineCountByPerson)) {
+      if (count > pipelineLeader.value) {
+        pipelineLeader = { name, value: count, displayValue: count.toString() }
       }
     }
     
