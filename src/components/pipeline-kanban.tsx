@@ -327,23 +327,15 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       
       const result = await response.json()
       setData(result)
+      // Leaderboard now comes from pipeline response
+      if (result.leaderboard) {
+        setLeaderboard(result.leaderboard)
+      }
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await fetch('/api/pipeline/leaderboard')
-      if (response.ok) {
-        const data = await response.json()
-        setLeaderboard(data)
-      }
-    } catch (err) {
-      console.error('Failed to fetch leaderboard:', err)
     }
   }
 
@@ -355,7 +347,6 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   
   useEffect(() => {
     fetchPipeline()
-    fetchLeaderboard()
   }, [clinicFilter, salespersonFilter])
 
   const handleDragStart = (event: DragStartEvent) => {

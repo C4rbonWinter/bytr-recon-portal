@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, STAGE_CONFIG } from '@/lib/pipeline-config'
-import { getDealTypesByContactIds } from '@/lib/supabase'
+import { getDealTypesByContactIds, getSupabase } from '@/lib/supabase'
 
 // GHL API tokens (in production, these would be env vars)
 const GHL_TOKENS: Record<string, string> = {
@@ -190,6 +190,152 @@ function calculateDaysInStage(lastStageChangeAt: string): number {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
 
+// Calculate leaderboard stats from pipeline cards + Supabase data
+interface LeaderboardEntry {
+  name: string
+  value: number
+  displayValue: string
+}
+
+interface LeaderboardStats {
+  dealsWon: LeaderboardEntry
+  totalCollections: LeaderboardEntry
+  biggestPipeline: LeaderboardEntry
+  fastestCloser: LeaderboardEntry
+}
+
+async function calculateLeaderboard(
+  allCards: { assignedTo: string; stage: string }[],
+  pipeline: Record<string, { assignedTo: string }[]>
+): Promise<LeaderboardStats> {
+  const formatCurrency = (n: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+  
+  // 1. Deals Won = count of cards in "won" stage by salesperson
+  const wonCards = pipeline['won'] || []
+  const wonBySP: Record<string, number> = {}
+  for (const card of wonCards) {
+    const sp = card.assignedTo
+    if (sp === 'Unassigned') continue
+    wonBySP[sp] = (wonBySP[sp] || 0) + 1
+  }
+  
+  let dealsWonLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
+  for (const [name, count] of Object.entries(wonBySP)) {
+    if (count > dealsWonLeader.value) {
+      dealsWonLeader = { name, value: count, displayValue: count.toString() }
+    }
+  }
+  
+  // 2. Biggest Pipeline = count of ALL cards by salesperson (excluding won/archive)
+  const activeBySP: Record<string, number> = {}
+  for (const card of allCards) {
+    const sp = card.assignedTo
+    if (sp === 'Unassigned') continue
+    // Exclude won and archive - we want active pipeline
+    if (card.stage === 'won' || card.stage === 'archive') continue
+    activeBySP[sp] = (activeBySP[sp] || 0) + 1
+  }
+  
+  let biggestPipelineLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
+  for (const [name, count] of Object.entries(activeBySP)) {
+    if (count > biggestPipelineLeader.value) {
+      biggestPipelineLeader = { name, value: count, displayValue: count.toString() }
+    }
+  }
+  
+  // 3 & 4. Collections and Fastest Closer from Supabase
+  let collectionsLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '$0' }
+  let fastestCloserLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '—' }
+  
+  try {
+    const supabase = getSupabase()
+    
+    // Total Collections = sum of verified payments grouped by deal salesperson
+    const { data: deals } = await supabase
+      .from('deals')
+      .select('id, salesperson, collected')
+    
+    if (deals) {
+      const collectionsBySP: Record<string, number> = {}
+      for (const deal of deals) {
+        const sp = deal.salesperson
+        if (!sp || sp === 'Unassigned') continue
+        collectionsBySP[sp] = (collectionsBySP[sp] || 0) + (deal.collected || 0)
+      }
+      
+      for (const [name, total] of Object.entries(collectionsBySP)) {
+        if (total > collectionsLeader.value) {
+          collectionsLeader = { name, value: total, displayValue: formatCurrency(total) }
+        }
+      }
+    }
+    
+    // Fastest Closer = avg time from deal creation to first payment (min 2 deals)
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('deal_id, payment_date, verified')
+      .eq('verified', true)
+    
+    if (deals && payments) {
+      // Build map of deal_id -> salesperson and created_at
+      const dealInfo: Record<string, { salesperson: string; createdAt: string }> = {}
+      for (const deal of deals) {
+        dealInfo[deal.id] = { salesperson: deal.salesperson, createdAt: (deal as any).created_at }
+      }
+      
+      // Find first payment date per deal
+      const firstPayment: Record<string, string> = {}
+      for (const p of payments) {
+        if (!firstPayment[p.deal_id] || p.payment_date < firstPayment[p.deal_id]) {
+          firstPayment[p.deal_id] = p.payment_date
+        }
+      }
+      
+      // Calculate close times by salesperson
+      const closeTimesBySP: Record<string, number[]> = {}
+      for (const [dealId, paymentDate] of Object.entries(firstPayment)) {
+        const info = dealInfo[dealId]
+        if (!info || !info.salesperson || info.salesperson === 'Unassigned' || !info.createdAt) continue
+        
+        const created = new Date(info.createdAt)
+        const paid = new Date(paymentDate)
+        const diffMs = paid.getTime() - created.getTime()
+        
+        // Sanity check: positive and less than 1 year
+        if (diffMs > 0 && diffMs < 365 * 24 * 60 * 60 * 1000) {
+          if (!closeTimesBySP[info.salesperson]) closeTimesBySP[info.salesperson] = []
+          closeTimesBySP[info.salesperson].push(diffMs)
+        }
+      }
+      
+      // Find fastest (lowest avg, min 2 closes)
+      let lowestAvgMs = Infinity
+      for (const [name, times] of Object.entries(closeTimesBySP)) {
+        if (times.length >= 2) {
+          const avgMs = times.reduce((a, b) => a + b, 0) / times.length
+          if (avgMs < lowestAvgMs) {
+            lowestAvgMs = avgMs
+            const days = Math.floor(avgMs / (1000 * 60 * 60 * 24))
+            const hours = Math.floor((avgMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+            const displayValue = days > 0 ? `${days}d ${hours}h` : `${hours}h`
+            fastestCloserLeader = { name, value: avgMs, displayValue }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Leaderboard Supabase error:', err)
+  }
+  
+  return {
+    dealsWon: dealsWonLeader,
+    totalCollections: collectionsLeader,
+    biggestPipeline: biggestPipelineLeader,
+    fastestCloser: fastestCloserLeader,
+  }
+}
+
 // Fetch Service field value for a contact
 async function fetchContactDealType(
   contactId: string,
@@ -374,7 +520,10 @@ export async function GET(request: NextRequest) {
       .map(id => ({ id, name: getSalespersonName(id as string) }))
       .sort((a, b) => a.name.localeCompare(b.name))
     
-    return NextResponse.json({ pipeline, totals, salespersons })
+    // Calculate leaderboard stats from pipeline data + Supabase
+    const leaderboard = await calculateLeaderboard(dedupedCards, pipeline)
+    
+    return NextResponse.json({ pipeline, totals, salespersons, leaderboard })
   } catch (error) {
     console.error('Pipeline API error:', error)
     return NextResponse.json({ error: 'Failed to fetch pipeline' }, { status: 500 })
