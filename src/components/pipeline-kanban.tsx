@@ -23,6 +23,18 @@ const ALL_SALESPEOPLE = Object.entries(SALESPERSON_IDS).map(([name, ids]) => ({
   ids: ids.join(','),
 }))
 
+// Deal type options for dropdown
+const DEAL_TYPES = [
+  'Full Arch',
+  'Double Arch',
+  'Single Arch',
+  'Zygo',
+  'Double Zygo',
+  'Restorative',
+  'U/L Onyx Upgrade',
+  'Other',
+]
+
 interface PipelineCard {
   id: string
   name: string
@@ -268,6 +280,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
+  const [editingDealType, setEditingDealType] = useState<string>('')
+  const [savingDealType, setSavingDealType] = useState(false)
   const [clinicFilter, setClinicFilter] = useState<string>('')
   const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
   const [sortBy, setSortBy] = useState<SortOption>('days_asc')
@@ -388,6 +402,56 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       await fetchPipeline()
     } finally {
       setUpdating(null)
+    }
+  }
+
+  // Initialize editingDealType when modal opens
+  useEffect(() => {
+    if (selectedCard) {
+      setEditingDealType(selectedCard.dealType || '')
+    }
+  }, [selectedCard])
+
+  // Handle deal type change
+  const handleDealTypeChange = async (newDealType: string) => {
+    if (!selectedCard || newDealType === selectedCard.dealType) return
+    
+    setEditingDealType(newDealType)
+    setSavingDealType(true)
+    
+    try {
+      const response = await fetch('/api/pipeline/deal-type', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedCard.contactId,
+          clinic: selectedCard.clinic,
+          dealType: newDealType,
+        }),
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to update deal type')
+      }
+      
+      // Update the card in local state
+      if (data) {
+        const newPipeline = { ...data.pipeline }
+        for (const stage of SUPER_STAGES) {
+          const cardIndex = newPipeline[stage].findIndex(c => c.id === selectedCard.id)
+          if (cardIndex !== -1) {
+            newPipeline[stage][cardIndex] = { ...newPipeline[stage][cardIndex], dealType: newDealType }
+            break
+          }
+        }
+        setData({ ...data, pipeline: newPipeline })
+        setSelectedCard({ ...selectedCard, dealType: newDealType })
+      }
+    } catch (err) {
+      console.error('Failed to update deal type:', err)
+      setEditingDealType(selectedCard.dealType || '')
+    } finally {
+      setSavingDealType(false)
     }
   }
 
@@ -560,9 +624,19 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                   <span className="text-muted-foreground text-sm">Days in Stage</span>
                   <DaysInStageBadge days={selectedCard.daysInStage} />
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground text-sm">Deal Type</span>
-                  <span className="text-foreground">{selectedCard.dealType || '—'}</span>
+                  <select
+                    value={editingDealType}
+                    onChange={(e) => handleDealTypeChange(e.target.value)}
+                    disabled={savingDealType}
+                    className="bg-secondary border border-border rounded px-2 py-1 text-sm text-foreground cursor-pointer hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                  >
+                    <option value="">— Select —</option>
+                    {DEAL_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">Source</span>
