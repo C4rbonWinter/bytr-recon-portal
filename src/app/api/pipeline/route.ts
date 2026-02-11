@@ -252,20 +252,31 @@ async function calculateLeaderboard(
     const supabase = getSupabase()
     
     // Total Collections = sum of verified payments grouped by deal salesperson
+    // Note: 'collected' is calculated from payments, not stored in deals table
     const { data: deals, error: dealsError } = await supabase
       .from('deals')
-      .select('id, salesperson, collected')
+      .select('id, salesperson')
     
-    if (dealsError) {
-      console.error('Leaderboard deals query error:', dealsError)
-    }
+    const { data: allPayments, error: allPaymentsError } = await supabase
+      .from('payments')
+      .select('deal_id, amount')
     
-    if (deals && deals.length > 0) {
-      const collectionsBySP: Record<string, number> = {}
+    if (dealsError) console.error('Leaderboard deals query error:', dealsError)
+    if (allPaymentsError) console.error('Leaderboard payments query error:', allPaymentsError)
+    
+    if (deals && deals.length > 0 && allPayments) {
+      // Build deal -> salesperson map
+      const dealSalesperson: Record<string, string> = {}
       for (const deal of deals) {
-        const sp = deal.salesperson
+        dealSalesperson[deal.id] = deal.salesperson
+      }
+      
+      // Sum payments by salesperson
+      const collectionsBySP: Record<string, number> = {}
+      for (const payment of allPayments) {
+        const sp = dealSalesperson[payment.deal_id]
         if (!sp || sp === 'Unassigned') continue
-        collectionsBySP[sp] = (collectionsBySP[sp] || 0) + (deal.collected || 0)
+        collectionsBySP[sp] = (collectionsBySP[sp] || 0) + (payment.amount || 0)
       }
       
       for (const [name, total] of Object.entries(collectionsBySP)) {
