@@ -137,7 +137,27 @@ export async function GET(request: NextRequest) {
     }
     
     // Calculate leaderboard stats
-    const leaderboard = await calculateLeaderboard(supabase)
+    // Fetch leaderboard from dedicated endpoint for consistency
+    // Use absolute URL to ensure it works in serverless environment
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : request.nextUrl.origin
+    
+    let leaderboard
+    try {
+      const leaderboardRes = await fetch(`${baseUrl}/api/pipeline/leaderboard`, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (leaderboardRes.ok) {
+        leaderboard = await leaderboardRes.json()
+      } else {
+        console.error('Leaderboard fetch failed:', leaderboardRes.status)
+        leaderboard = await calculateLeaderboard(supabase)
+      }
+    } catch (err) {
+      console.error('Leaderboard fetch error:', err)
+      leaderboard = await calculateLeaderboard(supabase)
+    }
     
     // Get list of unique salespersons
     const salespersonsMap = new Map<string, string>()
@@ -226,8 +246,70 @@ async function calculateLeaderboard(supabase: ReturnType<typeof getSupabase>): P
     }
   })
   
-  // Fastest closer (placeholder - would need deal close dates)
-  const fastestCloser = { name: '-', value: 0, displayValue: '-' }
+  // Fastest closer - average time from deal_month to first payment
+  const { data: dealsWithPayments, error: dealsError } = await supabase
+    .from('deals')
+    .select('salesperson, deal_month, payments(amount, payment_date)')
+    .not('deal_month', 'is', null)
+  
+  console.log('Deals with payments:', dealsWithPayments?.length, 'Error:', dealsError)
+  
+  const closeTimes = new Map<string, number[]>()
+  const monthNames: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+  }
+  
+  let processedCount = 0
+  for (const deal of dealsWithPayments || []) {
+    if (!deal.salesperson || !deal.deal_month) continue
+    const payments = deal.payments as { amount: number; payment_date: string }[] | null
+    if (!payments || payments.length === 0) continue
+    
+    // Parse deal_month (e.g., "Jan 2026")
+    const match = deal.deal_month.match(/^([A-Za-z]{3})\s+(\d{4})$/)
+    if (!match) {
+      console.log('Deal month no match:', deal.deal_month)
+      continue
+    }
+    const dealDate = new Date(parseInt(match[2]), monthNames[match[1]] || 0, 1)
+    processedCount++
+    
+    // Find first payment date
+    const firstPayment = payments.sort((a, b) => 
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    )[0]
+    if (!firstPayment?.payment_date) continue
+    
+    const paymentDate = new Date(firstPayment.payment_date)
+    const diffMs = paymentDate.getTime() - dealDate.getTime()
+    if (diffMs < 0) continue // Skip if payment before deal month
+    
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const times = closeTimes.get(deal.salesperson) || []
+    times.push(diffDays)
+    closeTimes.set(deal.salesperson, times)
+  }
+  
+  // Find salesperson with fastest average close time
+  let fastestCloser = { name: '-', value: Infinity, displayValue: '-' }
+  Array.from(closeTimes.entries()).forEach(([name, times]) => {
+    if (times.length === 0) return
+    const avg = times.reduce((a, b) => a + b, 0) / times.length
+    if (avg < fastestCloser.value) {
+      const days = Math.floor(avg)
+      const hours = Math.floor((avg - days) * 24)
+      fastestCloser = { 
+        name, 
+        value: avg, 
+        displayValue: `${days}d ${hours}h`
+      }
+    }
+  })
+  
+  if (fastestCloser.value === Infinity) {
+    fastestCloser = { name: '-', value: 0, displayValue: '-' }
+  }
   
   return {
     dealsWon: {
