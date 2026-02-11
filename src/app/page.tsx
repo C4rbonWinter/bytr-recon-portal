@@ -648,6 +648,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
                 required
               >
                 <option value="">Select salesperson...</option>
+                <option value="">Unassigned</option>
                 <option value="Chris">Chris</option>
                 <option value="Josh">Josh</option>
                 <option value="Molly">Molly</option>
@@ -832,6 +833,7 @@ function DealDetailModal({
                   onChange={(e) => setSalesperson(e.target.value)}
                   className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-zinc-600 dark:text-zinc-100"
                 >
+                  <option value="">Unassigned</option>
                   <option value="Chris">Chris</option>
                   <option value="Josh">Josh</option>
                   <option value="Molly">Molly</option>
