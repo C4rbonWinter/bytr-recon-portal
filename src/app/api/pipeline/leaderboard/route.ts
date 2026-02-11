@@ -153,15 +153,22 @@ export async function GET(request: NextRequest) {
       const config = CLINIC_CONFIG[clinic]
       
       try {
-        // Use GET method like the main pipeline route
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+        }
+        
+        // Fetch from sales pipeline specifically (has TX Plan, Closing, Signed with actual values)
+        // This matches what the main pipeline route does
+        const salesPipelineId = config.salesPipelineId
+        if (!salesPipelineId) {
+          console.log(`Leaderboard: No salesPipelineId for ${clinic}`)
+          continue
+        }
+        
         const response = await fetch(
-          `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Version': '2021-07-28',
-            },
-          }
+          `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&pipeline_id=${salesPipelineId}`,
+          { headers }
         )
         
         if (!response.ok) {
@@ -170,7 +177,7 @@ export async function GET(request: NextRequest) {
         }
         
         const data = await response.json()
-        console.log(`Leaderboard: ${clinic} returned ${data.opportunities?.length || 0} opportunities`)
+        console.log(`Leaderboard: ${clinic} returned ${data.opportunities?.length || 0} opportunities from sales pipeline`)
         
         for (const opp of data.opportunities || []) {
           const sp = getSalespersonName(opp.assignedTo)
