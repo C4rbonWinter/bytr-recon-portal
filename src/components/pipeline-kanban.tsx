@@ -441,13 +441,29 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
     return () => document.removeEventListener('keydown', handleEscape)
   }, [selectedCard])
 
-  // Handle deal type change
+  // Handle deal type change - update UI immediately, save in background
   const handleDealTypeChange = async (newDealType: string) => {
-    if (!selectedCard || newDealType === selectedCard.dealType) return
+    if (!selectedCard) return
     
+    // Update UI immediately
     setEditingDealType(newDealType)
-    setSavingDealType(true)
     
+    // Update local state immediately (optimistic update)
+    if (data) {
+      const newPipeline = { ...data.pipeline }
+      for (const stage of SUPER_STAGES) {
+        const cardIndex = newPipeline[stage].findIndex(c => c.id === selectedCard.id)
+        if (cardIndex !== -1) {
+          newPipeline[stage][cardIndex] = { ...newPipeline[stage][cardIndex], dealType: newDealType }
+          break
+        }
+      }
+      setData({ ...data, pipeline: newPipeline })
+      setSelectedCard({ ...selectedCard, dealType: newDealType })
+    }
+    
+    // Save to backend in background (don't reset on failure)
+    setSavingDealType(true)
     try {
       const response = await fetch('/api/pipeline/deal-type', {
         method: 'POST',
@@ -460,25 +476,12 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       })
       
       if (!response.ok) {
-        throw new Error('Failed to update deal type')
-      }
-      
-      // Update the card in local state
-      if (data) {
-        const newPipeline = { ...data.pipeline }
-        for (const stage of SUPER_STAGES) {
-          const cardIndex = newPipeline[stage].findIndex(c => c.id === selectedCard.id)
-          if (cardIndex !== -1) {
-            newPipeline[stage][cardIndex] = { ...newPipeline[stage][cardIndex], dealType: newDealType }
-            break
-          }
-        }
-        setData({ ...data, pipeline: newPipeline })
-        setSelectedCard({ ...selectedCard, dealType: newDealType })
+        console.error('Failed to save deal type to server')
+        // Don't reset - keep the local change, will sync on next load
       }
     } catch (err) {
       console.error('Failed to update deal type:', err)
-      setEditingDealType(selectedCard.dealType || '')
+      // Don't reset - keep the local change
     } finally {
       setSavingDealType(false)
     }
@@ -743,15 +746,21 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                 )}
               </div>
               
-              <div className="mt-4 pt-4 border-t border-border">
+              <div className="mt-4 pt-4 border-t border-border flex gap-2">
                 <a
                   href={`https://app.gohighlevel.com/contacts/${selectedCard.contactId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full text-center px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors font-medium"
+                  className="flex-1 text-center px-4 py-2 bg-secondary text-foreground border border-border rounded-lg hover:bg-secondary/80 transition-colors font-medium"
                 >
                   Open in GHL
                 </a>
+                <button
+                  onClick={() => setSelectedCard(null)}
+                  className="flex-1 px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors font-medium"
+                >
+                  Close / Save
+                </button>
               </div>
             </div>
           </div>

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { updateDealTypeByContactId } from '@/lib/supabase'
-
-// GHL API tokens
-const GHL_TOKENS: Record<string, string> = {
-  TR01: process.env.GHL_TOKEN_SG || '',
-  TR02: process.env.GHL_TOKEN_IRV || '',
-  TR04: process.env.GHL_TOKEN_VEGAS || '',
-}
+import { updateDealTypeByContactId, getSupabase } from '@/lib/supabase'
+import { CLINIC_CONFIG } from '@/lib/pipeline-config'
 
 // Service (deal type) custom field IDs per clinic
 const SERVICE_FIELD_IDS: Record<string, string> = {
   TR01: 'QlA7Mso7jPC20Ng8wHyq',
   TR02: 'IdlYaG597ASHeuoFeIuk',
   TR04: 'fK1TUWuawPzN9pkkxEV7',
+}
+
+// Per-location API tokens (private integrations with full access)
+const LOCATION_TOKENS: Record<string, string> = {
+  TR01: process.env.GHL_TOKEN_TR01 || '',
+  TR02: process.env.GHL_TOKEN_TR02 || '',
+  TR04: process.env.GHL_TOKEN_TR04 || '',
 }
 
 export async function POST(request: NextRequest) {
@@ -24,14 +25,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing contactId or clinic' }, { status: 400 })
     }
     
-    const token = GHL_TOKENS[clinic]
+    const config = CLINIC_CONFIG[clinic as keyof typeof CLINIC_CONFIG]
     const fieldId = SERVICE_FIELD_IDS[clinic]
+    const token = LOCATION_TOKENS[clinic]
     
-    if (!token || !fieldId) {
+    if (!config || !fieldId) {
       return NextResponse.json({ error: 'Invalid clinic configuration' }, { status: 400 })
     }
     
-    // Update the contact's Service custom field
+    if (!token) {
+      console.error(`Missing GHL_TOKEN_${clinic} env var`)
+      return NextResponse.json({ error: 'Missing API token for clinic' }, { status: 500 })
+    }
+    
+    // Update the contact's Service custom field using per-location token
     const response = await fetch(
       `https://services.leadconnectorhq.com/contacts/${contactId}`,
       {
@@ -58,12 +65,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update deal type in GHL' }, { status: 500 })
     }
     
-    // Also update Supabase (if matching deal exists)
+    // Update Supabase opportunities table (for pipeline display)
+    const supabase = getSupabase()
+    try {
+      await supabase
+        .from('opportunities')
+        .update({ deal_type: dealType || null })
+        .eq('contact_id', contactId)
+    } catch (err) {
+      console.error('Opportunities update error (non-fatal):', err)
+    }
+    
+    // Also update Supabase deals table (if matching deal exists)
     try {
       await updateDealTypeByContactId(contactId, dealType || '')
     } catch (err) {
-      console.error('Supabase sync error (non-fatal):', err)
-      // Don't fail the request if Supabase update fails - GHL is updated
+      console.error('Deals sync error (non-fatal):', err)
     }
     
     return NextResponse.json({ success: true })

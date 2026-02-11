@@ -164,27 +164,50 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Get pipeline data from Supabase for biggest pipeline
-    // Count OPEN opportunities (cards) per salesperson
+    // 2. Get pipeline data from Supabase for biggest pipeline AND deals won
+    // Fetch ALL opportunities to calculate both metrics
+    const { data: allOpportunities, error: oppsError } = await supabase
+      .from('opportunities')
+      .select('assigned_to_name, super_stage')
+    
+    if (oppsError) {
+      console.error('Opportunities error:', oppsError)
+    }
+    
+    // Count opportunities in "won" stage per salesperson (Deals Won)
+    const dealsWonByPerson: Record<string, number> = {}
+    // Count OPEN opportunities (not won/archive) per salesperson (Biggest Pipeline)
     const pipelineCountByPerson: Record<string, number> = {}
     
-    const { data: pipelineOpps, error: pipelineError } = await supabase
-      .from('opportunities')
-      .select('assigned_to_name')
-      .not('super_stage', 'in', '("won","archive")')
-    
-    if (pipelineError) {
-      console.error('Pipeline opportunities error:', pipelineError)
-    } else {
-      for (const opp of pipelineOpps || []) {
-        const sp = opp.assigned_to_name || 'Unassigned'
-        if (sp === 'Unassigned') continue
-        
+    for (const opp of allOpportunities || []) {
+      const sp = opp.assigned_to_name || 'Unassigned'
+      if (sp === 'Unassigned') continue
+      
+      if (opp.super_stage === 'won') {
+        if (!dealsWonByPerson[sp]) dealsWonByPerson[sp] = 0
+        dealsWonByPerson[sp]++
+      } else if (opp.super_stage !== 'archive') {
         if (!pipelineCountByPerson[sp]) pipelineCountByPerson[sp] = 0
         pipelineCountByPerson[sp]++
       }
     }
     
+    // Override salesStats dealsWon with opportunity-based counts
+    for (const [sp, count] of Object.entries(dealsWonByPerson)) {
+      if (!salesStats[sp]) {
+        salesStats[sp] = { dealsWon: 0, collections: 0, closeTimesMs: [] }
+      }
+      salesStats[sp].dealsWon = count
+    }
+    
+    // For salespersons not in dealsWonByPerson, ensure dealsWon is 0
+    for (const sp of Object.keys(salesStats)) {
+      if (!dealsWonByPerson[sp]) {
+        salesStats[sp].dealsWon = 0
+      }
+    }
+    
+    console.log('Leaderboard: dealsWonByPerson =', dealsWonByPerson)
     console.log('Leaderboard: pipelineCountByPerson =', pipelineCountByPerson)
 
     // 3. Find leaders for each category

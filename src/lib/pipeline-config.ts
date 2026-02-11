@@ -43,6 +43,8 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   // Closing
   'closing call': 'closing',
   'negotiation': 'closing',
+  'signed': 'closing',
+  'signed ': 'closing',  // Note: some have trailing space
   
   // Financing
   'finance link sent': 'financing',
@@ -54,9 +56,7 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   'patient preferred link': 'financing',
   'eligible': 'financing',
   
-  // Won
-  'signed': 'won',
-  'signed ': 'won',  // Note: some have trailing space
+  // Won (down payment received = truly closed)
   'down payment': 'won',
   'down payment ': 'won',
   'won': 'won',
