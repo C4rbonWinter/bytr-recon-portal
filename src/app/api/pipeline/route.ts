@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName } from '@/lib/pipeline-config'
+import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, STAGE_CONFIG } from '@/lib/pipeline-config'
 
 // GHL API tokens (in production, these would be env vars)
 const GHL_TOKENS: Record<string, string> = {
@@ -316,6 +316,23 @@ export async function GET(request: NextRequest) {
       card.dealType = dealTypes[card.contactId] || ''
     }
     
+    // Dedupe by contactId - keep the card furthest along in the pipeline
+    const cardsByContact = new Map<string, PipelineCard>()
+    for (const card of cards) {
+      const existing = cardsByContact.get(card.contactId)
+      if (!existing) {
+        cardsByContact.set(card.contactId, card)
+      } else {
+        // Keep the one with higher stage order (furthest along)
+        const existingOrder = STAGE_CONFIG[existing.stage].order
+        const currentOrder = STAGE_CONFIG[card.stage].order
+        if (currentOrder > existingOrder) {
+          cardsByContact.set(card.contactId, card)
+        }
+      }
+    }
+    const dedupedCards = Array.from(cardsByContact.values())
+    
     // Group by stage
     const pipeline: Record<SuperStage, PipelineCard[]> = {
       virtual: [],
@@ -327,7 +344,7 @@ export async function GET(request: NextRequest) {
       archive: [],
     }
     
-    for (const card of cards) {
+    for (const card of dedupedCards) {
       pipeline[card.stage].push(card)
     }
     
@@ -338,8 +355,8 @@ export async function GET(request: NextRequest) {
     
     // Calculate totals
     const totals = {
-      count: cards.length,
-      value: cards.reduce((sum, c) => sum + c.value, 0),
+      count: dedupedCards.length,
+      value: dedupedCards.reduce((sum, c) => sum + c.value, 0),
       byStage: Object.fromEntries(
         SUPER_STAGES.map(stage => [
           stage,
@@ -352,7 +369,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Get unique salespersons for filter dropdown
-    const salespersons = Array.from(new Set(cards.map(c => c.assignedToId).filter(Boolean)))
+    const salespersons = Array.from(new Set(dedupedCards.map(c => c.assignedToId).filter(Boolean)))
       .map(id => ({ id, name: getSalespersonName(id as string) }))
       .sort((a, b) => a.name.localeCompare(b.name))
     
