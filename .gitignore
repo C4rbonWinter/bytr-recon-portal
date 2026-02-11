@@ -4,3 +4,4 @@ node_modules/
 .vercel
 .env.check
 .env.local-fresh
+node_modules/
