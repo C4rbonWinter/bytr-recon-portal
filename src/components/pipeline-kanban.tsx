@@ -185,7 +185,7 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
       
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || card.source}</span>
+        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || '—'}</span>
       </div>
     </div>
   )
@@ -207,7 +207,7 @@ function CardOverlay({ card, showSalesperson }: { card: PipelineCard; showSalesp
       </div>
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || card.source}</span>
+        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || '—'}</span>
       </div>
     </div>
   )
