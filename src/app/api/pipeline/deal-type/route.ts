@@ -21,13 +21,22 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabase()
     
     // 1. Update Supabase opportunities table immediately (for instant UI)
-    const { error: oppError } = await supabase
+    const { data: updateResult, error: oppError } = await supabase
       .from('opportunities')
-      .update({ deal_type: dealType || null })
+      .update({ deal_type: dealType || null, updated_at: new Date().toISOString() })
       .eq('contact_id', contactId)
+      .select('id, name, deal_type')
+    
+    console.log('Deal type update result:', { contactId, dealType, updateResult, oppError })
     
     if (oppError) {
       console.error('Opportunities update error:', oppError)
+      return NextResponse.json({ error: oppError.message }, { status: 500 })
+    }
+    
+    if (!updateResult || updateResult.length === 0) {
+      console.error('No opportunity found for contactId:', contactId)
+      return NextResponse.json({ error: 'No opportunity found for contact' }, { status: 404 })
     }
     
     // 2. Queue the GHL sync for background processing

@@ -74,6 +74,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
     
+    // DEBUG: Log opportunities with deal_type
+    const withDealType = (opportunities || []).filter(o => o.deal_type)
+    console.log('Opportunities with deal_type:', withDealType.map(o => ({ id: o.id, name: o.name, deal_type: o.deal_type })))
+    
     // Fetch stage overrides (local changes not yet synced)
     const { data: overrides } = await supabase
       .from('stage_overrides')
