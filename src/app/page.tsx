@@ -6,6 +6,32 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
 import { CheckCircle2, AlertCircle, XCircle, Flag } from 'lucide-react'
 
+// GHL User ID → Name mapping for display fallback
+const GHL_USER_MAPPING: Record<string, string> = {
+  'xGHzefX0G70ObVhtULtS': 'Josh',
+  'W02cGzjo8DOEvq3EnNH5': 'Chris',
+  '40OKojJlHK1QGWxobiFB': 'Molly',
+  'R2lQOlnfA2u3ozRUIA5a': 'Scot',
+  'dIYBT07Gjs2KnrHqSWiH': 'Jake',
+  'DRr7a8bJ3SYfc7Uaonle': 'Blake',
+  'cnHNqiEGjpOOWVzsZnJe': 'Josh',
+  'MH14SnZ7liJIMIBd2mge': 'Chris',
+  'OYwn6OtVac85ljn26qle': 'Molly',
+  'qdkCS02nCbZhGmn0R8zE': 'Scot',
+  '1pShLvH7qVgRjaMVp80p': 'Jake',
+  'drbfnr6OcLkSfSSxgev0': 'Blake',
+}
+
+function getSalespersonDisplay(value: string | null): string {
+  if (!value) return 'Unassigned'
+  // If it's a known name, return as-is
+  if (['Chris', 'Josh', 'Molly', 'Scot', 'Jake', 'Blake', 'TBD', 'Unassigned'].includes(value)) {
+    return value
+  }
+  // If it's a GHL ID, map it
+  return GHL_USER_MAPPING[value] || 'Unassigned'
+}
+
 // Types
 interface Payment {
   id: string
@@ -406,7 +432,7 @@ export default function Dashboard() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-sm">{deal.clinic} ({clinicNames[deal.clinic]})</td>
-                  {!isSalesperson && <td className="px-4 py-3 text-muted-foreground text-sm">{deal.salesperson}</td>}
+                  {!isSalesperson && <td className="px-4 py-3 text-muted-foreground text-sm">{getSalespersonDisplay(deal.salesperson)}</td>}
                   <td className="px-4 py-3 text-left text-foreground">
                     {formatCurrency(deal.planTotal)}
                     {deal.invoiceLink && (
@@ -755,7 +781,7 @@ function DealDetailModal({
           <div>
             <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
             <p className="text-sm text-gray-500 dark:text-zinc-400">
-              {deal.dealType} • {deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${deal.salesperson}`}
+              {deal.dealType} • {deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${getSalespersonDisplay(deal.salesperson)}`}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
