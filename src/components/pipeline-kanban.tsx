@@ -562,14 +562,11 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
     >
       <div>
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-foreground tracking-tight">Pipeline</h2>
-            {updating && (
-              <span className="text-xs text-muted-foreground animate-pulse">Updating...</span>
-            )}
+        {updating && (
+          <div className="mb-4">
+            <span className="text-xs text-muted-foreground animate-pulse">Updating...</span>
           </div>
-        </div>
+        )}
 
         {/* Stats Cards */}
         {isAdmin && leaderboard && data && (

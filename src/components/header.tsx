@@ -73,7 +73,7 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
                 : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
             }`}
           >
-            Kanban
+            Pipeline
           </Link>
         </nav>
         
