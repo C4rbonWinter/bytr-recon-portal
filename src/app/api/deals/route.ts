@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const deal = await createDeal({
       patient_name: body.patientName,
       clinic: body.clinic,
-      salesperson: body.salesperson,
+      salesperson: body.salesperson || 'Unassigned',
       shared_with: body.sharedWith || null,
       deal_type: body.dealType,
       plan_total: parseFloat(body.planTotal) || 0,
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('PATCH /api/deals received:', body)
     const { id, ...updates } = body
     
     if (!id) {
@@ -74,7 +75,7 @@ export async function PATCH(request: NextRequest) {
     
     if (updates.sharedWith !== undefined) updateData.shared_with = updates.sharedWith
     if (updates.shared_with !== undefined) updateData.shared_with = updates.shared_with
-    if (updates.salesperson !== undefined) updateData.salesperson = updates.salesperson || null
+    if (updates.salesperson !== undefined) updateData.salesperson = updates.salesperson || 'Unassigned'
     if (updates.plan_total !== undefined) updateData.plan_total = updates.plan_total
     if (updates.planTotal !== undefined) updateData.plan_total = updates.planTotal
     if (updates.status) updateData.status = updates.status
@@ -84,13 +85,17 @@ export async function PATCH(request: NextRequest) {
     if (updates.deal_month) updateData.deal_month = updates.deal_month
     if (updates.dealMonth) updateData.deal_month = updates.dealMonth
     
+    console.log('Updating deal', id, 'with:', updateData)
     const deal = await updateDeal(id, updateData)
+    console.log('Update result:', deal)
     
     return NextResponse.json({ deal })
-  } catch (error) {
-    console.error('Failed to update deal:', error)
+  } catch (error: any) {
+    // Handle Supabase errors which have a message property
+    const errorMessage = error?.message || error?.error || JSON.stringify(error) || 'Unknown error'
+    console.error('Failed to update deal:', errorMessage, error)
     return NextResponse.json(
-      { error: 'Failed to update deal' },
+      { error: 'Failed to update deal: ' + errorMessage },
       { status: 500 }
     )
   }

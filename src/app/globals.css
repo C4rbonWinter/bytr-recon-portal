@@ -41,7 +41,8 @@
     --chart-3: 339 100% 48%;
     --chart-4: 277 55% 41%;
     --chart-5: 213 60% 57%;
-    --chart-6: 157 100% 50%;
+    --chart-6: 162 100% 39%;
+    --success: 162 100% 39%;
     --radius: 0.625rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 220 14% 25%;
@@ -79,7 +80,8 @@
     --chart-3: 339 100% 48%;
     --chart-4: 277 55% 41%;
     --chart-5: 213 60% 57%;
-    --chart-6: 157 100% 50%;
+    --chart-6: 162 100% 39%;
+    --success: 162 100% 39%;
     --sidebar-background: 220 14% 5%;
     --sidebar-foreground: 210 20% 90%;
     --sidebar-primary: 339 100% 48%;

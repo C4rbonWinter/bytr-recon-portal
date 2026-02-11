@@ -1,9 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://pwktjywsyiliteuxspnt.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+let supabaseInstance: SupabaseClient | null = null
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey)
+export function getSupabase(): SupabaseClient {
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://pwktjywsyiliteuxspnt.supabase.co'
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    supabaseInstance = createClient(supabaseUrl, supabaseServiceKey)
+  }
+  return supabaseInstance
+}
+
+// For backwards compatibility - use getSupabase() in new code
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    return (getSupabase() as any)[prop]
+  }
+})
 
 // Types
 export interface Deal {
@@ -87,6 +100,8 @@ export async function createDeal(deal: Omit<Deal, 'id' | 'created_at' | 'updated
 
 // Update a deal
 export async function updateDeal(id: string, updates: Partial<Deal>): Promise<Deal> {
+  console.log('supabase.updateDeal called:', { id, updates })
+  
   const { data, error } = await supabase
     .from('deals')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -94,7 +109,12 @@ export async function updateDeal(id: string, updates: Partial<Deal>): Promise<De
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    console.error('Supabase error:', error)
+    throw new Error(error.message || JSON.stringify(error))
+  }
+  
+  console.log('supabase.updateDeal result:', data)
   return data
 }
 
@@ -123,6 +143,30 @@ export async function createPayment(payment: Omit<Payment, 'id' | 'created_at' |
   
   // Update deal status
   await updateDealStatus(payment.deal_id)
+  
+  return data
+}
+
+// Verify a payment
+export async function verifyPayment(id: string, verified: boolean, verifiedBy: string): Promise<Payment> {
+  const { data, error } = await supabase
+    .from('payments')
+    .update({
+      verified,
+      verified_by: verifiedBy,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  
+  // Update deal status
+  if (data?.deal_id) {
+    await updateDealStatus(data.deal_id)
+  }
   
   return data
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayments, createPayment, deletePayment } from '@/lib/supabase'
+import { getPayments, createPayment, deletePayment, verifyPayment } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +41,27 @@ export async function POST(request: NextRequest) {
     console.error('Failed to create payment:', error)
     return NextResponse.json(
       { error: 'Failed to create payment' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, verified, verifiedBy } = body
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Missing payment id' }, { status: 400 })
+    }
+    
+    const payment = await verifyPayment(id, verified, verifiedBy)
+    
+    return NextResponse.json({ payment })
+  } catch (error) {
+    console.error('Failed to verify payment:', error)
+    return NextResponse.json(
+      { error: 'Failed to verify payment' },
       { status: 500 }
     )
   }

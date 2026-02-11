@@ -156,7 +156,7 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="bg-card rounded-lg p-3 border border-border cursor-grab active:cursor-grabbing hover:border-primary/30 transition-colors touch-none"
+      className="bg-card rounded-lg p-3 border border-border cursor-grab active:cursor-grabbing hover:border-zinc-400/50 focus-visible:ring-2 focus-visible:ring-zinc-400/30 focus-visible:border-zinc-400 transition-colors touch-none outline-none"
     >
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-medium text-sm text-foreground truncate flex-1" title={card.name}>
@@ -181,7 +181,7 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
 // Static card for drag overlay
 function CardOverlay({ card, showSalesperson }: { card: PipelineCard; showSalesperson: boolean }) {
   return (
-    <div className="bg-card rounded-lg p-3 border-2 border-primary shadow-lg w-[260px] opacity-95">
+    <div className="bg-card rounded-lg p-3 border-2 border-zinc-400 shadow-lg w-[260px] opacity-95">
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-medium text-sm text-foreground truncate flex-1">
           {truncateName(card.name)}
@@ -226,7 +226,7 @@ function DroppableColumn({
     <div 
       ref={setNodeRef}
       className={`flex-1 min-w-[240px] max-w-[300px] bg-secondary/50 rounded-lg p-2 transition-colors ${
-        isOver ? 'ring-2 ring-primary bg-primary/5' : ''
+        isOver ? 'ring-2 ring-zinc-400 bg-zinc-400/5' : ''
       }`}
     >
       <div className="flex justify-between items-center mb-3 px-1">
@@ -460,12 +460,12 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search patient..."
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground placeholder:text-muted-foreground w-40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground placeholder:text-muted-foreground w-40 focus:ring-2 focus:ring-zinc-400/30 focus:border-zinc-400 outline-none"
             />
             <select
               value={clinicFilter}
               onChange={(e) => setClinicFilter(e.target.value)}
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground"
+              className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
             >
               <option value="">All Clinics</option>
               <option value="TR01">TR01 (SG)</option>
@@ -477,7 +477,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
               <select
                 value={salespersonFilter}
                 onChange={(e) => setSalespersonFilter(e.target.value)}
-                className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground"
+                className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
               >
                 <option value="">All Salespeople</option>
                 {ALL_SALESPEOPLE.map(sp => (
@@ -489,7 +489,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground"
+              className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
             >
               {SORT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>

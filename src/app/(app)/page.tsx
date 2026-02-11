@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
-import { ThemeToggle } from '@/components/theme-toggle'
-import { Logo } from '@/components/logo'
-import { CheckCircle2, AlertCircle, XCircle, Flag } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { CheckCircle2, AlertTriangle, XCircle, Flag, FileSpreadsheet } from 'lucide-react'
+import { Header } from '@/components/header'
 
 // GHL User ID → Name mapping for display fallback
 const GHL_USER_MAPPING: Record<string, string> = {
@@ -97,16 +96,28 @@ const clinicNames: Record<string, string> = {
   TR04: 'LV',
 }
 
+const clinicColors: Record<string, string> = {
+  TR01: 'bg-chart-5/10 text-chart-5',
+  TR02: 'bg-chart-4/10 text-chart-4',
+  TR04: 'bg-chart-2/10 text-chart-2',
+}
+
+const ClinicBadge = ({ clinic }: { clinic: string }) => (
+  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${clinicColors[clinic] || 'bg-secondary text-muted-foreground'}`}>
+    {clinic} ({clinicNames[clinic]})
+  </span>
+)
+
 const StatusIcon = ({ status }: { status: string }) => {
   switch (status) {
     case 'verified':
-      return <CheckCircle2 className="h-5 w-5 text-chart-6" />
+      return <CheckCircle2 className="h-5 w-5 text-success" />
     case 'partial':
-      return <AlertCircle className="h-5 w-5 text-chart-3" />
+      return <AlertTriangle className="h-5 w-5 text-[#fc5707]" />
     case 'unpaid':
-      return <XCircle className="h-5 w-5 text-destructive" />
+      return <XCircle className="h-5 w-5 text-primary" />
     case 'flagged':
-      return <Flag className="h-5 w-5 text-chart-3" />
+      return <Flag className="h-5 w-5 text-primary" />
     default:
       return null
   }
@@ -214,6 +225,35 @@ export default function Dashboard() {
     }
   }
 
+  const handleVerifyPayment = async (dealId: string, paymentId: string) => {
+    try {
+      const response = await fetch('/api/payments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: paymentId,
+          verified: true,
+          verifiedBy: session?.user?.email || 'admin',
+        }),
+      })
+      
+      if (response.ok) {
+        await fetchDeals()
+        setSelectedDeal(prev => {
+          if (!prev || prev.id !== dealId) return prev
+          return { 
+            ...prev, 
+            payments: prev.payments.map(p => 
+              p.id === paymentId ? { ...p, verified: true } : p
+            ) 
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Failed to verify payment:', error)
+    }
+  }
+
   const handleCreateDeal = async (dealData: any) => {
     try {
       const response = await fetch('/api/deals', {
@@ -241,7 +281,6 @@ export default function Dashboard() {
       
       if (response.ok) {
         await fetchDeals()
-        // Update the selected deal with new data
         setSelectedDeal(prev => {
           if (!prev || prev.id !== id) return prev
           return { 
@@ -250,9 +289,13 @@ export default function Dashboard() {
             ...(updates.salesperson !== undefined && { salesperson: updates.salesperson || null }),
           }
         })
+      } else {
+        const data = await response.json()
+        alert('Save failed: ' + (data.error || 'Unknown error'))
       }
     } catch (error) {
       console.error('Failed to update deal:', error)
+      alert('Save failed: ' + error)
     }
   }
 
@@ -267,14 +310,50 @@ export default function Dashboard() {
   const totalPending = totalPlanned - totalCollected
   const flaggedCount = deals.filter(d => d.status === 'flagged' || d.status === 'partial').length
 
+  // Unverified cash payments for notifications
+  const unverifiedPayments = allDeals.flatMap(deal => 
+    deal.payments
+      .filter(p => p.method === 'Cash' && !p.verified)
+      .map(p => ({
+        paymentId: p.id,
+        dealId: deal.id,
+        patientName: deal.patientName,
+        amount: p.amount,
+        date: p.date,
+      }))
+  )
+
+  // Handle clicking a notification to open the deal
+  const handlePaymentNotificationClick = (dealId: string) => {
+    const deal = allDeals.find(d => d.id === dealId)
+    if (deal) {
+      setSelectedDeal(deal)
+    }
+  }
+
   // Get unique months from deals for filter dropdown
-  const availableMonths = Array.from(new Set(deals.map(d => d.dealMonth))).sort().reverse()
+  // Normalize months to YYYY-MM format, dedupe, and sort newest first
+  const normalizeMonth = (month: string): string => {
+    if (!month) return ''
+    // Already in YYYY-MM format
+    if (/^\d{4}-\d{2}$/.test(month)) return month
+    // Try parsing "Month Year" or "Mon Year" format
+    const parsed = new Date(month + ' 1')
+    if (!isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`
+    }
+    return month
+  }
+  
+  const availableMonths = Array.from(
+    new Set(deals.map(d => normalizeMonth(d.dealMonth)).filter(Boolean))
+  ).sort().reverse()
 
   // Filtered deals
   const filteredDeals = deals.filter(d => {
     if (clinicFilter !== 'all' && d.clinic !== clinicFilter) return false
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
-    if (monthFilter !== 'all' && d.dealMonth !== monthFilter) return false
+    if (monthFilter !== 'all' && normalizeMonth(d.dealMonth) !== monthFilter) return false
     if (searchQuery && !d.patientName.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
   })
@@ -293,48 +372,12 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-[1800px] mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <Logo className="h-7 w-auto" />
-              <span className="font-semibold text-foreground tracking-tight">Recon</span>
-            </div>
-            <nav className="flex gap-4 ml-4">
-              <a href="/" className="text-foreground font-medium text-sm">Deals</a>
-              <a href="/pipeline" className="text-muted-foreground hover:text-foreground transition-colors text-sm">Pipeline</a>
-            </nav>
-            {isSalesperson && <span className="text-sm text-muted-foreground">My Deals</span>}
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <button
-              onClick={() => setShowNewDeal(true)}
-              className="bg-foreground text-background px-4 py-2 rounded-lg hover:bg-foreground/90 transition text-sm font-medium"
-            >
-              + New Deal
-            </button>
-            <div className="relative group">
-              <span className="text-muted-foreground cursor-pointer py-2 text-sm">{currentUser.name} ▼</span>
-              <div className="absolute right-0 top-full pt-1 w-48 hidden group-hover:block z-20">
-                <div className="bg-card rounded-lg shadow-lg border border-border">
-                  <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border">
-                    {session?.user?.email}
-                  </div>
-                  <button
-                    onClick={() => signOut({ callbackUrl: '/login' })}
-                    className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-b-lg"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <>
+      <Header 
+        onNewDeal={() => setShowNewDeal(true)} 
+        unverifiedPayments={unverifiedPayments}
+        onPaymentClick={handlePaymentNotificationClick}
+      />
 
       <main className="max-w-[1800px] mx-auto px-6 py-6">
         {/* Stats Cards */}
@@ -343,33 +386,33 @@ export default function Dashboard() {
             <div className="text-2xl font-bold text-foreground tracking-tight">{formatCurrency(totalPlanned)}</div>
             <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Total Planned</div>
           </div>
-          <div className="bg-card p-5 rounded-lg border border-border hover:border-chart-1/20 transition-colors">
-            <div className="text-2xl font-bold text-chart-1 tracking-tight">{formatCurrency(totalCollected)}</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-success/20 transition-colors">
+            <div className="text-2xl font-bold text-success tracking-tight">{formatCurrency(totalCollected)}</div>
             <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Verified Collected</div>
           </div>
-          <div className="bg-card p-5 rounded-lg border border-border hover:border-chart-2/20 transition-colors">
-            <div className="text-2xl font-bold text-chart-2 tracking-tight">{formatCurrency(totalPending)}</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-chart-1/20 transition-colors">
+            <div className="text-2xl font-bold text-chart-1 tracking-tight">{formatCurrency(totalPending)}</div>
             <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Pending Balance</div>
           </div>
-          <div className="bg-card p-5 rounded-lg border border-border hover:border-destructive/20 transition-colors">
-            <div className="text-2xl font-bold text-destructive tracking-tight">{flaggedCount}</div>
+          <div className="bg-card p-5 rounded-lg border border-border hover:border-primary/20 transition-colors">
+            <div className="text-2xl font-bold text-primary tracking-tight">{flaggedCount}</div>
             <div className="text-xs uppercase tracking-widest text-muted-foreground mt-1">Need Attention</div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-4">
+        {/* Filters - right justified */}
+        <div className="flex gap-3 mb-4 justify-end">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search patient..."
-            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground placeholder:text-muted-foreground w-48 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground placeholder:text-muted-foreground w-48 text-sm focus:ring-2 focus:ring-zinc-400/30 focus:border-zinc-400 outline-none"
           />
           <select
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
+            className="border border-border rounded-lg pl-3 pr-8 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Months</option>
             {availableMonths.map(month => {
@@ -385,7 +428,7 @@ export default function Dashboard() {
           <select
             value={clinicFilter}
             onChange={(e) => setClinicFilter(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
+            className="border border-border rounded-lg pl-3 pr-8 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Clinics</option>
             <option value="TR01">TR01 (SG)</option>
@@ -395,7 +438,7 @@ export default function Dashboard() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 bg-secondary text-foreground text-sm"
+            className="border border-border rounded-lg pl-3 pr-8 py-2 bg-secondary text-foreground text-sm"
           >
             <option value="all">All Status</option>
             <option value="verified">Verified</option>
@@ -431,7 +474,7 @@ export default function Dashboard() {
                       >⊕</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-sm">{deal.clinic} ({clinicNames[deal.clinic]})</td>
+                  <td className="px-4 py-3"><ClinicBadge clinic={deal.clinic} /></td>
                   {!isSalesperson && <td className="px-4 py-3 text-muted-foreground text-sm">{getSalespersonDisplay(deal.salesperson)}</td>}
                   <td className="px-4 py-3 text-left text-foreground">
                     {formatCurrency(deal.planTotal)}
@@ -441,18 +484,18 @@ export default function Dashboard() {
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="ml-1.5 text-chart-5 hover:text-chart-5/70 transition-colors"
+                        className="ml-1.5 text-chart-5 hover:text-chart-5/70 transition-colors inline-flex"
                         title="View invoice"
-                      >↗</a>
+                      ><FileSpreadsheet className="h-4 w-4" /></a>
                     )}
                   </td>
                   <td 
-                    className={`px-4 py-3 text-left cursor-help ${deal.collected === 0 ? 'text-foreground font-bold' : 'text-chart-6'}`}
+                    className={`px-4 py-3 text-left cursor-help ${(deal.planTotal - deal.collected) === 0 ? 'text-success' : 'text-muted-foreground'}`}
                     title={deal.payments.length > 0 ? deal.payments.map(p => `${p.method}: ${formatCurrency(p.amount)}${!p.verified ? ' (pending)' : ''}`).join('\n') : ''}
                   >
                     {formatCurrency(deal.collected)}
                   </td>
-                  <td className={`px-4 py-3 text-left ${(deal.planTotal - deal.collected) === 0 ? 'text-chart-6' : 'text-chart-1'}`}>{formatCurrency(deal.planTotal - deal.collected)}</td>
+                  <td className={`px-4 py-3 text-left ${(deal.planTotal - deal.collected) === 0 ? 'text-success' : 'text-chart-1'}`}>{formatCurrency(deal.planTotal - deal.collected)}</td>
                   <td className="px-4 py-3 flex justify-center"><StatusIcon status={deal.status} /></td>
                 </tr>
               ))}
@@ -473,11 +516,12 @@ export default function Dashboard() {
           onClose={() => setSelectedDeal(null)} 
           onAddPayment={(payment) => handleAddPayment(selectedDeal.id, payment)}
           onDeletePayment={(paymentId) => handleDeletePayment(selectedDeal.id, paymentId)}
+          onVerifyPayment={(paymentId) => handleVerifyPayment(selectedDeal.id, paymentId)}
           onUpdateDeal={handleUpdateDeal}
           isSalesperson={isSalesperson}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -719,6 +763,7 @@ function DealDetailModal({
   onClose, 
   onAddPayment,
   onDeletePayment,
+  onVerifyPayment,
   onUpdateDeal,
   isSalesperson 
 }: { 
@@ -726,6 +771,7 @@ function DealDetailModal({
   onClose: () => void
   onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
   onDeletePayment: (paymentId: string) => void
+  onVerifyPayment: (paymentId: string) => void
   onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => Promise<void>
   isSalesperson: boolean
 }) {
@@ -799,9 +845,9 @@ function DealDetailModal({
                     href={deal.invoiceLink} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="ml-1 hover:opacity-70"
+                    className="ml-1 hover:opacity-70 text-chart-5 inline-flex"
                     title="View invoice"
-                  >📋</a>
+                  ><FileSpreadsheet className="h-4 w-4" /></a>
                 )}
               </div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total</div>
@@ -810,8 +856,12 @@ function DealDetailModal({
               <div className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(deal.collected)}</div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Collected</div>
             </div>
-            <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
-              <div className="text-lg font-bold text-orange-500 dark:text-orange-400">{formatCurrency(balance)}</div>
+            <div className={`text-center p-3 rounded-lg ${
+              balance === 0 ? 'bg-success/10' : deal.collected === 0 ? 'bg-primary/10' : 'bg-chart-1/10'
+            }`}>
+              <div className={`text-lg font-bold ${
+                balance === 0 ? 'text-success' : deal.collected === 0 ? 'text-primary' : 'text-chart-1'
+              }`}>{formatCurrency(balance)}</div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Balance</div>
             </div>
           </div>
@@ -894,6 +944,15 @@ function DealDetailModal({
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
                       {payment.date}
                       {payment.verified && <span>✅</span>}
+                      {!isSalesperson && payment.method === 'Cash' && !payment.verified && (
+                        <button
+                          onClick={() => onVerifyPayment(payment.id)}
+                          className="text-xs bg-success/10 text-success px-2 py-1 rounded hover:bg-success/20 transition-colors font-medium"
+                          title="Verify payment"
+                        >
+                          Verify
+                        </button>
+                      )}
                       {!isSalesperson && (
                         <button
                           onClick={() => onDeletePayment(payment.id)}
