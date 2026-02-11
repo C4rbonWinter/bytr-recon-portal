@@ -252,11 +252,15 @@ async function calculateLeaderboard(
     const supabase = getSupabase()
     
     // Total Collections = sum of verified payments grouped by deal salesperson
-    const { data: deals } = await supabase
+    const { data: deals, error: dealsError } = await supabase
       .from('deals')
       .select('id, salesperson, collected')
     
-    if (deals) {
+    if (dealsError) {
+      console.error('Leaderboard deals query error:', dealsError)
+    }
+    
+    if (deals && deals.length > 0) {
       const collectionsBySP: Record<string, number> = {}
       for (const deal of deals) {
         const sp = deal.salesperson
@@ -272,16 +276,24 @@ async function calculateLeaderboard(
     }
     
     // Fastest Closer = avg time from deal creation to first payment (min 2 deals)
-    const { data: payments } = await supabase
+    // Re-fetch deals with created_at for this calculation
+    const { data: dealsWithDates, error: datesError } = await supabase
+      .from('deals')
+      .select('id, salesperson, created_at')
+    
+    const { data: payments, error: paymentsError } = await supabase
       .from('payments')
       .select('deal_id, payment_date, verified')
       .eq('verified', true)
     
-    if (deals && payments) {
+    if (datesError) console.error('Leaderboard dates query error:', datesError)
+    if (paymentsError) console.error('Leaderboard payments query error:', paymentsError)
+    
+    if (dealsWithDates && dealsWithDates.length > 0 && payments && payments.length > 0) {
       // Build map of deal_id -> salesperson and created_at
       const dealInfo: Record<string, { salesperson: string; createdAt: string }> = {}
-      for (const deal of deals) {
-        dealInfo[deal.id] = { salesperson: deal.salesperson, createdAt: (deal as any).created_at }
+      for (const deal of dealsWithDates) {
+        dealInfo[deal.id] = { salesperson: deal.salesperson, createdAt: deal.created_at }
       }
       
       // Find first payment date per deal
