@@ -245,11 +245,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const result: LeaderboardStats = {
+    const result = {
       dealsWon: dealsWonLeader,
       totalCollections: collectionsLeader,
       biggestPipeline: pipelineLeader,
       fastestCloser: fastestCloser,
+      // Debug info (remove after testing)
+      _debug: {
+        tokensAvailable: {
+          TR01: !!getGHLToken('TR01'),
+          TR02: !!getGHLToken('TR02'),
+          TR04: !!getGHLToken('TR04'),
+        },
+        pipelineByPerson,
+      }
     }
 
     return NextResponse.json(result)
