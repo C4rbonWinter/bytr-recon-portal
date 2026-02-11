@@ -572,8 +572,13 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         </div>
 
         {/* Stats Cards */}
-        {isAdmin && leaderboard && (
-          <div className="grid grid-cols-4 gap-4 mb-4">
+        {isAdmin && leaderboard && data && (
+          <div className="grid grid-cols-5 gap-4 mb-4">
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-foreground/20 transition-colors">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Pipeline</div>
+              <div className="text-2xl font-bold text-foreground tracking-tight">{formatCurrency(data.totals.value)}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{data.totals.count} opportunities</div>
+            </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-chart-5/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Deals Won</div>
               <div className="text-2xl font-bold text-chart-5 tracking-tight">{leaderboard.dealsWon.displayValue}</div>
