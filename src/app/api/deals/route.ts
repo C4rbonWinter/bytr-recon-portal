@@ -74,7 +74,7 @@ export async function PATCH(request: NextRequest) {
     
     if (updates.sharedWith !== undefined) updateData.shared_with = updates.sharedWith
     if (updates.shared_with !== undefined) updateData.shared_with = updates.shared_with
-    if (updates.salesperson) updateData.salesperson = updates.salesperson
+    if (updates.salesperson !== undefined) updateData.salesperson = updates.salesperson || null
     if (updates.plan_total !== undefined) updateData.plan_total = updates.plan_total
     if (updates.planTotal !== undefined) updateData.plan_total = updates.planTotal
     if (updates.status) updateData.status = updates.status
