@@ -134,31 +134,37 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Get pipeline data from GHL for biggest pipeline
+    // Fetch OPEN opportunities (active pipeline, not won/lost)
     const pipelineByPerson: Record<string, number> = {}
     
     for (const clinic of ['TR01', 'TR02', 'TR04'] as const) {
       const token = GHL_TOKENS[clinic]
-      if (!token) continue
+      if (!token) {
+        console.log(`Leaderboard: No GHL token for ${clinic}`)
+        continue
+      }
       
       const config = CLINIC_CONFIG[clinic]
       
       try {
+        // Use GET method like the main pipeline route
         const response = await fetch(
           `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100`,
           {
-            method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Version': '2021-07-28',
-              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({}),
           }
         )
         
-        if (!response.ok) continue
+        if (!response.ok) {
+          console.error(`Leaderboard: GHL API error for ${clinic}: ${response.status}`)
+          continue
+        }
         
         const data = await response.json()
+        console.log(`Leaderboard: ${clinic} returned ${data.opportunities?.length || 0} opportunities`)
         
         for (const opp of data.opportunities || []) {
           const sp = getSalespersonName(opp.assignedTo)
@@ -168,9 +174,11 @@ export async function GET(request: NextRequest) {
           pipelineByPerson[sp] += opp.monetaryValue || 0
         }
       } catch (err) {
-        console.error(`Failed to fetch pipeline for ${clinic}:`, err)
+        console.error(`Leaderboard: Failed to fetch pipeline for ${clinic}:`, err)
       }
     }
+    
+    console.log('Leaderboard: pipelineByPerson =', pipelineByPerson)
 
     // 3. Find leaders for each category
     const formatCurrency = (n: number) => 
