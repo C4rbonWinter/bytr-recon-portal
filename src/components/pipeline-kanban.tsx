@@ -572,19 +572,19 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
               <div className="text-2xl font-bold text-chart-5 tracking-tight">{leaderboard.dealsWon.displayValue}</div>
               <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.dealsWon.name}</div>
             </div>
-            <div className="bg-card p-4 rounded-lg border border-border hover:border-chart-4/20 transition-colors">
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Total Collections</div>
-              <div className="text-2xl font-bold text-chart-4 tracking-tight">{leaderboard.totalCollections.displayValue}</div>
+              <div className="text-2xl font-bold text-success tracking-tight">{leaderboard.totalCollections.displayValue}</div>
               <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.totalCollections.name}</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Biggest Pipeline</div>
-              <div className="text-2xl font-bold text-success tracking-tight">{leaderboard.biggestPipeline.displayValue}</div>
+              <div className="text-2xl font-bold text-chart-1 tracking-tight">{leaderboard.biggestPipeline.displayValue}</div>
               <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.biggestPipeline.name}</div>
             </div>
-            <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-primary/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Fastest Closer</div>
-              <div className="text-2xl font-bold text-chart-1 tracking-tight">{leaderboard.fastestCloser.displayValue}</div>
+              <div className="text-2xl font-bold text-primary tracking-tight">{leaderboard.fastestCloser.displayValue}</div>
               <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.fastestCloser.name}</div>
             </div>
           </div>
