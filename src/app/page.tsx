@@ -247,7 +247,7 @@ export default function Dashboard() {
           return { 
             ...prev, 
             ...(updates.sharedWith !== undefined && { sharedWith: updates.sharedWith }),
-            ...(updates.salesperson && { salesperson: updates.salesperson }),
+            ...(updates.salesperson !== undefined && { salesperson: updates.salesperson || null }),
           }
         })
       }
