@@ -1,6 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDeals, createDeal, updateDeal, findDeal } from '@/lib/supabase'
 
+// GHL API tokens for deal type sync
+const GHL_TOKENS: Record<string, string> = {
+  TR01: process.env.GHL_TOKEN_SG || '',
+  TR02: process.env.GHL_TOKEN_IRV || '',
+  TR04: process.env.GHL_TOKEN_VEGAS || '',
+}
+
+// Service (deal type) custom field IDs per clinic
+const SERVICE_FIELD_IDS: Record<string, string> = {
+  TR01: 'QlA7Mso7jPC20Ng8wHyq',
+  TR02: 'IdlYaG597ASHeuoFeIuk',
+  TR04: 'fK1TUWuawPzN9pkkxEV7',
+}
+
+// Sync deal type to GHL
+async function syncDealTypeToGHL(contactId: string, clinic: string, dealType: string): Promise<void> {
+  const token = GHL_TOKENS[clinic]
+  const fieldId = SERVICE_FIELD_IDS[clinic]
+  
+  if (!token || !fieldId || !contactId) return
+  
+  try {
+    await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customFields: [{ id: fieldId, value: dealType || '' }],
+        }),
+      }
+    )
+  } catch (err) {
+    console.error('GHL deal type sync error:', err)
+  }
+}
+
 const SYNC_API_KEY = process.env.SYNC_API_KEY || 'recon-sync-2026'
 
 function checkSyncAuth(request: NextRequest): boolean {
@@ -84,9 +125,16 @@ export async function PATCH(request: NextRequest) {
     if (updates.invoiceLink !== undefined) updateData.invoice_link = updates.invoiceLink
     if (updates.deal_month) updateData.deal_month = updates.deal_month
     if (updates.dealMonth) updateData.deal_month = updates.dealMonth
+    if (updates.deal_type !== undefined) updateData.deal_type = updates.deal_type
+    if (updates.dealType !== undefined) updateData.deal_type = updates.dealType
     
     console.log('Updating deal', id, 'with:', updateData)
     const deal = await updateDeal(id, updateData)
+    
+    // Sync deal type to GHL if changed and we have a contact ID
+    if ((updates.deal_type !== undefined || updates.dealType !== undefined) && deal.ghl_contact_id) {
+      await syncDealTypeToGHL(deal.ghl_contact_id, deal.clinic, deal.deal_type)
+    }
     console.log('Update result:', deal)
     
     return NextResponse.json({ deal })

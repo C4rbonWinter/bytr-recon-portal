@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { updateDealTypeByContactId } from '@/lib/supabase'
 
 // GHL API tokens
 const GHL_TOKENS: Record<string, string> = {
@@ -55,6 +56,14 @@ export async function POST(request: NextRequest) {
       const errorText = await response.text()
       console.error('GHL update error:', errorText)
       return NextResponse.json({ error: 'Failed to update deal type in GHL' }, { status: 500 })
+    }
+    
+    // Also update Supabase (if matching deal exists)
+    try {
+      await updateDealTypeByContactId(contactId, dealType || '')
+    } catch (err) {
+      console.error('Supabase sync error (non-fatal):', err)
+      // Don't fail the request if Supabase update fails - GHL is updated
     }
     
     return NextResponse.json({ success: true })

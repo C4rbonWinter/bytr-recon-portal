@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, STAGE_CONFIG } from '@/lib/pipeline-config'
+import { getDealTypesByContactIds } from '@/lib/supabase'
 
 // GHL API tokens (in production, these would be env vars)
 const GHL_TOKENS: Record<string, string> = {
@@ -307,9 +308,9 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Batch fetch deal types from GHL contacts
-    const contactsToFetch = cards.map(c => ({ contactId: c.contactId, clinic: c.clinic }))
-    const dealTypes = await batchFetchDealTypes(contactsToFetch, GHL_TOKENS)
+    // Fetch deal types from Supabase (faster than GHL)
+    const contactIds = cards.map(c => c.contactId).filter(Boolean)
+    const dealTypes = await getDealTypesByContactIds(contactIds)
     
     // Update cards with deal types
     for (const card of cards) {

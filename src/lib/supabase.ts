@@ -225,3 +225,38 @@ export async function updateDealStatus(dealId: string): Promise<void> {
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', dealId)
 }
+
+// Get deal types by GHL contact IDs (for Pipeline view)
+export async function getDealTypesByContactIds(contactIds: string[]): Promise<Record<string, string>> {
+  if (contactIds.length === 0) return {}
+  
+  const { data, error } = await supabase
+    .from('deals')
+    .select('ghl_contact_id, deal_type')
+    .in('ghl_contact_id', contactIds)
+  
+  if (error) throw error
+  
+  const result: Record<string, string> = {}
+  for (const deal of data || []) {
+    if (deal.ghl_contact_id && deal.deal_type) {
+      result[deal.ghl_contact_id] = deal.deal_type
+    }
+  }
+  return result
+}
+
+// Update deal type by GHL contact ID (for Pipeline → Deals sync)
+export async function updateDealTypeByContactId(
+  contactId: string, 
+  dealType: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('deals')
+    .update({ deal_type: dealType, updated_at: new Date().toISOString() })
+    .eq('ghl_contact_id', contactId)
+    .select()
+  
+  if (error) throw error
+  return (data?.length || 0) > 0
+}
