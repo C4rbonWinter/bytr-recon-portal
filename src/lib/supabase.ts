@@ -2,8 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Create a fresh client for each request to avoid stale connection issues
 export function getSupabase(): SupabaseClient {
-  const supabaseUrl = process.env.SUPABASE_URL || 'https://pwktjywsyiliteuxspnt.supabase.co'
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  const supabaseUrl = (process.env.SUPABASE_URL || 'https://pwktjywsyiliteuxspnt.supabase.co').trim()
+  const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
   return createClient(supabaseUrl, supabaseServiceKey, {
     db: {
       schema: 'public',
@@ -11,6 +11,11 @@ export function getSupabase(): SupabaseClient {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
     },
   })
 }
