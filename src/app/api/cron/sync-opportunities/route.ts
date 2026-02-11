@@ -127,6 +127,17 @@ export async function POST(request: NextRequest) {
       const { opportunities, stageNames } = await fetchClinicOpportunities(clinic, config)
       results[clinic].fetched = opportunities.length
       
+      // Fetch existing deal_type values so we don't overwrite them
+      const oppIds = opportunities.map(opp => opp.id)
+      const { data: existingRecords } = await supabase
+        .from('opportunities')
+        .select('id, deal_type')
+        .in('id', oppIds)
+      
+      const existingDealTypes = new Map<string, string | null>(
+        (existingRecords || []).map(r => [r.id, r.deal_type])
+      )
+      
       // Transform and upsert to Supabase
       const rows = opportunities
         .map(opp => {
@@ -147,7 +158,7 @@ export async function POST(request: NextRequest) {
             assigned_to_id: opp.assignedTo || null,
             assigned_to_name: getSalespersonName(opp.assignedTo),
             source: opp.source || null,
-            deal_type: null, // Will be populated separately
+            deal_type: existingDealTypes.get(opp.id) || null, // Preserve existing deal_type
             contact_id: opp.contactId || null,
             email: opp.contact?.email || null,
             phone: opp.contact?.phone || null,
