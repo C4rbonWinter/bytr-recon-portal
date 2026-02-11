@@ -53,10 +53,10 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase()
     
-    // Build query for opportunities
+    // Build query for opportunities (explicit columns to avoid PostgREST caching issues)
     let query = supabase
       .from('opportunities')
-      .select('*')
+      .select('id, name, monetary_value, clinic, super_stage, ghl_stage_id, ghl_stage_name, assigned_to_id, assigned_to_name, source, deal_type, contact_id, email, phone, tags, days_in_stage, last_stage_change_at, created_at, synced_at, updated_at')
       .order('name')
     
     if (clinicFilter) {
