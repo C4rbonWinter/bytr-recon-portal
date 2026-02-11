@@ -847,9 +847,11 @@ function DealDetailModal({
         <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
           <div>
             <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
-            <p className="text-sm text-gray-500 dark:text-zinc-400">
-              {deal.dealType} • {deal.clinic} ({clinicNames[deal.clinic]}){!isSalesperson && ` • ${getSalespersonDisplay(deal.salesperson)}`}
-            </p>
+            <div className="flex items-center gap-2 mt-1 text-sm text-gray-500 dark:text-zinc-400">
+              {deal.dealType && <span>{deal.dealType}</span>}
+              <ClinicBadge clinic={deal.clinic} />
+              {!isSalesperson && <span>{getSalespersonDisplay(deal.salesperson)}</span>}
+            </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
         </div>
