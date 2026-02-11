@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Bell, RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
+import { SyncIndicator } from '@/components/sync-indicator'
 
 interface ViewAsOption {
   id: string
@@ -161,10 +162,13 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
           
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-muted-foreground hover:text-foreground transition-colors text-sm"
+            className="text-muted-foreground hover:text-foreground transition-colors text-xs"
           >
             Log Out
           </button>
+          
+          {/* Sync Status Indicator - far right */}
+          {isPipeline && <SyncIndicator />}
         </div>
       </div>
     </header>

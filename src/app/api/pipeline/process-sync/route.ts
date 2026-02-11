@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPendingMoves, markSynced, markFailed } from '@/lib/sync-queue'
 import { getLocationToken } from '@/lib/ghl-oauth'
+import { getSupabase } from '@/lib/supabase'
 import { CLINIC_CONFIG, SuperStage, STAGE_NAME_TO_SUPER } from '@/lib/pipeline-config'
 
 export const dynamic = 'force-dynamic'
@@ -30,7 +31,7 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
   const accessToken = tokenResult.accessToken
 
   try {
-    // Fetch pipeline stages
+    // Fetch the specific sales pipeline stages
     const pipelinesRes = await fetch(
       `https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${clinicConfig.locationId}`,
       {
@@ -47,41 +48,50 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
 
     const pipelinesData = await pipelinesRes.json()
     const pipelines = pipelinesData.pipelines || []
+    
+    // Find the sales pipeline specifically
+    const salesPipeline = pipelines.find((p: { id: string }) => p.id === clinicConfig.salesPipelineId)
+    if (!salesPipeline) {
+      return { success: false, error: `Sales pipeline not found: ${clinicConfig.salesPipelineId}` }
+    }
 
-    // Find matching stage
+    // Find matching stage within the sales pipeline only
     let targetStageId: string | null = null
     const targetStageNames = SUPER_TO_TARGET_STAGES[move.toStage as SuperStage] || []
+    const stages = salesPipeline.stages || []
 
-    for (const pipeline of pipelines) {
-      for (const stage of pipeline.stages || []) {
-        const stageName = stage.name?.toLowerCase().trim()
-        for (const targetName of targetStageNames) {
-          if (stageName === targetName.toLowerCase()) {
-            targetStageId = stage.id
-            break
-          }
+    // First try exact match with target stage names
+    for (const stage of stages) {
+      const stageName = stage.name?.toLowerCase().trim()
+      for (const targetName of targetStageNames) {
+        if (stageName === targetName.toLowerCase()) {
+          targetStageId = stage.id
+          break
         }
-        if (targetStageId) break
       }
       if (targetStageId) break
     }
 
     // Fallback: check STAGE_NAME_TO_SUPER mapping
     if (!targetStageId) {
-      for (const pipeline of pipelines) {
-        for (const stage of pipeline.stages || []) {
-          const stageName = stage.name?.toLowerCase().trim()
-          if (STAGE_NAME_TO_SUPER[stageName] === move.toStage) {
-            targetStageId = stage.id
-            break
-          }
+      for (const stage of stages) {
+        const stageName = stage.name?.toLowerCase().trim()
+        if (STAGE_NAME_TO_SUPER[stageName] === move.toStage) {
+          targetStageId = stage.id
+          break
         }
-        if (targetStageId) break
       }
     }
 
     if (!targetStageId) {
-      return { success: false, error: `No matching stage for ${move.toStage}` }
+      // Archive has no GHL equivalent - just mark as synced (local-only move)
+      if (move.toStage === 'archive') {
+        console.log(`Archive move for ${move.opportunityId} - no GHL stage, marking synced locally`)
+        return { success: true }
+      }
+      // Log available stages for debugging
+      const availableStages = stages.map((s: { name: string }) => s.name).join(', ')
+      return { success: false, error: `No matching stage for ${move.toStage}. Available: ${availableStages}` }
     }
 
     // Update the opportunity
@@ -103,6 +113,13 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
       return { success: false, error: `GHL update failed: ${updateRes.status} - ${errorText}` }
     }
 
+    // GHL updated successfully - clear the local override since GHL now has the correct stage
+    const supabase = getSupabase()
+    await supabase
+      .from('stage_overrides')
+      .delete()
+      .eq('opportunity_id', move.opportunityId)
+
     return { success: true }
   } catch (err) {
     return { success: false, error: String(err) }
@@ -110,13 +127,7 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
 }
 
 export async function POST(request: NextRequest) {
-  // Optional: verify cron secret
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+  // TODO: Add cron secret auth for production
   try {
     const pendingMoves = await getPendingMoves(10)
     

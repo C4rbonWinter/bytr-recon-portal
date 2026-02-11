@@ -1,23 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/sync-invoice-values",
-      "schedule": "0 7 * * *"
+      "path": "/api/cron/sync-opportunities?clinic=TR01",
+      "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/sync-won-deals",
-      "schedule": "0 8 * * *"
-    }
-  ],
-  "headers": [
+      "path": "/api/cron/sync-opportunities?clinic=TR02", 
+      "schedule": "1-59/5 * * * *"
+    },
     {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "x-vercel-protection-bypass",
-          "value": "true"
-        }
-      ]
+      "path": "/api/cron/sync-opportunities?clinic=TR04",
+      "schedule": "2-59/5 * * * *"
     }
   ]
 }

@@ -1,70 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSuperStageByName, CLINIC_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, STAGE_CONFIG } from '@/lib/pipeline-config'
-import { getDealTypesByContactIds, getSupabase } from '@/lib/supabase'
+import { SUPER_STAGES, SuperStage, STAGE_CONFIG } from '@/lib/pipeline-config'
+import { getSupabase } from '@/lib/supabase'
 
-// GHL API tokens (in production, these would be env vars)
-const GHL_TOKENS: Record<string, string> = {
-  TR01: process.env.GHL_TOKEN_SG || '',
-  TR02: process.env.GHL_TOKEN_IRV || '',
-  TR04: process.env.GHL_TOKEN_VEGAS || '',
-}
-
-// Service (deal type) custom field IDs per clinic
-const SERVICE_FIELD_IDS: Record<string, string> = {
-  TR01: 'QlA7Mso7jPC20Ng8wHyq',
-  TR02: 'IdlYaG597ASHeuoFeIuk',
-  TR04: 'fK1TUWuawPzN9pkkxEV7',
-}
-
-// Clean up deal type display (remove "Implants" as it's implied)
-function formatDealType(raw: string | null | undefined): string {
-  if (!raw) return ''
-  return raw.replace(/\s*Implants?$/i, '').trim()
-}
-
-// Parse deal_month to a start-of-month date (more accurate than created_at which is import time)
-function parseDealMonth(dm: string | null): Date | null {
-  if (!dm) return null
-  // Formats: "Jan 2026", "Dec 2025", "2026-02"
-  const monthNames: Record<string, number> = {
-    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
-    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
-  }
-  // Try "MMM YYYY" format
-  const match1 = dm.match(/^([A-Za-z]{3})\s+(\d{4})$/)
-  if (match1) {
-    const month = monthNames[match1[1]]
-    const year = parseInt(match1[2])
-    if (month !== undefined) return new Date(year, month, 1)
-  }
-  // Try "YYYY-MM" format
-  const match2 = dm.match(/^(\d{4})-(\d{2})$/)
-  if (match2) {
-    return new Date(parseInt(match2[1]), parseInt(match2[2]) - 1, 1)
-  }
-  return null
-}
-
-interface GHLOpportunity {
-  id: string
-  name: string
-  monetaryValue: number
-  pipelineStageId: string
-  assignedTo: string
-  status: string
-  source: string
-  createdAt: string
-  updatedAt: string
-  lastStageChangeAt: string
-  contactId: string
-  contact?: {
-    id: string
-    name: string
-    email: string
-    phone: string
-    tags: string[]
-  }
-}
+export const dynamic = 'force-dynamic'
 
 interface PipelineCard {
   id: string
@@ -74,9 +12,9 @@ interface PipelineCard {
   stage: SuperStage
   ghlStageId: string
   assignedToId: string | null
-  assignedTo: string  // Display name
+  assignedTo: string
   source: string
-  dealType: string    // From GHL "Service" custom field
+  dealType: string
   daysInStage: number
   contactId: string
   email?: string
@@ -85,135 +23,6 @@ interface PipelineCard {
   createdAt: string
 }
 
-interface GHLStage {
-  id: string
-  name: string
-}
-
-// Cache for stage ID → name mappings per clinic
-const stageNameCache: Record<string, Record<string, string>> = {}
-
-async function fetchStageNames(clinic: keyof typeof CLINIC_CONFIG): Promise<Record<string, string>> {
-  if (stageNameCache[clinic]) {
-    return stageNameCache[clinic]
-  }
-  
-  const config = CLINIC_CONFIG[clinic]
-  const token = GHL_TOKENS[clinic]
-  
-  if (!token) return {}
-  
-  try {
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${config.locationId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-        },
-      }
-    )
-    
-    if (!response.ok) return {}
-    
-    const data = await response.json()
-    const mapping: Record<string, string> = {}
-    
-    for (const pipeline of data.pipelines || []) {
-      for (const stage of pipeline.stages || []) {
-        mapping[stage.id] = stage.name
-      }
-    }
-    
-    stageNameCache[clinic] = mapping
-    return mapping
-  } catch (error) {
-    console.error(`Failed to fetch stages for ${clinic}:`, error)
-    return {}
-  }
-}
-
-async function fetchGHLOpportunities(clinic: keyof typeof CLINIC_CONFIG): Promise<GHLOpportunity[]> {
-  const config = CLINIC_CONFIG[clinic]
-  const token = GHL_TOKENS[clinic]
-  
-  if (!token) {
-    console.error(`No GHL token for ${clinic}`)
-    return []
-  }
-  
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Version': '2021-07-28',
-  }
-  
-  try {
-    // Fetch from multiple sources to get full picture:
-    // 1. Recent open opportunities (newest first)
-    // 2. Sales pipeline specifically (has TX Plan, Closing, Signed stages)
-    // 3. Won opportunities
-    const fetchPromises = [
-      // General open, newest first
-      fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&order=desc`,
-        { headers }
-      ),
-      // Won opportunities
-      fetch(
-        `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=won&limit=100`,
-        { headers }
-      ),
-    ]
-    
-    // Add sales pipeline query if configured
-    if (config.salesPipelineId) {
-      fetchPromises.push(
-        fetch(
-          `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&pipeline_id=${config.salesPipelineId}`,
-          { headers }
-        )
-      )
-    }
-    
-    const responses = await Promise.all(fetchPromises)
-    
-    // Check for errors
-    for (const res of responses) {
-      if (!res.ok) {
-        console.error(`GHL API error for ${clinic}: ${res.status}`)
-      }
-    }
-    
-    const dataArrays = await Promise.all(responses.map(r => r.json()))
-    
-    // Combine all opportunities and dedupe by ID
-    const allOpps: GHLOpportunity[] = []
-    for (const data of dataArrays) {
-      if (data.opportunities) {
-        allOpps.push(...data.opportunities)
-      }
-    }
-    
-    const seen = new Set<string>()
-    return allOpps.filter(opp => {
-      if (seen.has(opp.id)) return false
-      seen.add(opp.id)
-      return true
-    })
-  } catch (error) {
-    console.error(`Failed to fetch GHL opportunities for ${clinic}:`, error)
-    return []
-  }
-}
-
-function calculateDaysInStage(lastStageChangeAt: string): number {
-  const changeDate = new Date(lastStageChangeAt)
-  const now = new Date()
-  const diffMs = now.getTime() - changeDate.getTime()
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24))
-}
-
-// Calculate leaderboard stats from pipeline cards + Supabase data
 interface LeaderboardEntry {
   name: string
   value: number
@@ -227,394 +36,212 @@ interface LeaderboardStats {
   fastestCloser: LeaderboardEntry
 }
 
-async function calculateLeaderboard(
-  allCards: { assignedTo: string; stage: string }[],
-  pipeline: Record<string, { assignedTo: string }[]>
-): Promise<LeaderboardStats> {
-  const formatCurrency = (n: number) => 
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
-  
-  // 1. Deals Won = count of cards in "won" stage by salesperson
-  const wonCards = pipeline['won'] || []
-  const wonBySP: Record<string, number> = {}
-  for (const card of wonCards) {
-    const sp = card.assignedTo
-    if (sp === 'Unassigned') continue
-    wonBySP[sp] = (wonBySP[sp] || 0) + 1
-  }
-  
-  let dealsWonLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
-  for (const [name, count] of Object.entries(wonBySP)) {
-    if (count > dealsWonLeader.value) {
-      dealsWonLeader = { name, value: count, displayValue: count.toString() }
-    }
-  }
-  
-  // 2. Biggest Pipeline = count of ALL cards by salesperson (excluding won/archive)
-  const activeBySP: Record<string, number> = {}
-  for (const card of allCards) {
-    const sp = card.assignedTo
-    if (sp === 'Unassigned') continue
-    // Exclude won and archive - we want active pipeline
-    if (card.stage === 'won' || card.stage === 'archive') continue
-    activeBySP[sp] = (activeBySP[sp] || 0) + 1
-  }
-  
-  let biggestPipelineLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
-  for (const [name, count] of Object.entries(activeBySP)) {
-    if (count > biggestPipelineLeader.value) {
-      biggestPipelineLeader = { name, value: count, displayValue: count.toString() }
-    }
-  }
-  
-  // 3 & 4. Collections and Fastest Closer from Supabase
-  let collectionsLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '$0' }
-  let fastestCloserLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '—' }
-  
-  try {
-    const supabase = getSupabase()
-    
-    // Total Collections = sum of verified payments grouped by deal salesperson
-    // Note: 'collected' is calculated from payments, not stored in deals table
-    const { data: deals, error: dealsError } = await supabase
-      .from('deals')
-      .select('id, salesperson')
-    
-    const { data: allPayments, error: allPaymentsError } = await supabase
-      .from('payments')
-      .select('deal_id, amount')
-    
-    if (dealsError) console.error('Leaderboard deals query error:', dealsError)
-    if (allPaymentsError) console.error('Leaderboard payments query error:', allPaymentsError)
-    
-    if (deals && deals.length > 0 && allPayments) {
-      // Build deal -> salesperson map
-      const dealSalesperson: Record<string, string> = {}
-      for (const deal of deals) {
-        dealSalesperson[deal.id] = deal.salesperson
-      }
-      
-      // Sum payments by salesperson
-      const collectionsBySP: Record<string, number> = {}
-      for (const payment of allPayments) {
-        const sp = dealSalesperson[payment.deal_id]
-        if (!sp || sp === 'Unassigned') continue
-        collectionsBySP[sp] = (collectionsBySP[sp] || 0) + (payment.amount || 0)
-      }
-      
-      for (const [name, total] of Object.entries(collectionsBySP)) {
-        if (total > collectionsLeader.value) {
-          collectionsLeader = { name, value: total, displayValue: formatCurrency(total) }
-        }
-      }
-    }
-    
-    // Fastest Closer = avg time from deal start (deal_month) to first payment (min 2 deals)
-    // Use deal_month instead of created_at (which is import timestamp, not actual deal start)
-    const { data: dealsWithDates, error: datesError } = await supabase
-      .from('deals')
-      .select('id, salesperson, deal_month')
-    
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('deal_id, payment_date, verified')
-      .eq('verified', true)
-    
-    if (datesError) console.error('Leaderboard dates query error:', datesError)
-    if (paymentsError) console.error('Leaderboard payments query error:', paymentsError)
-    
-    if (dealsWithDates && dealsWithDates.length > 0 && payments && payments.length > 0) {
-      // Build map of deal_id -> salesperson and deal start date (from deal_month)
-      const dealInfo: Record<string, { salesperson: string; startDate: Date | null }> = {}
-      for (const deal of dealsWithDates) {
-        dealInfo[deal.id] = { salesperson: deal.salesperson, startDate: parseDealMonth(deal.deal_month) }
-      }
-      
-      // Find first payment date per deal
-      const firstPayment: Record<string, string> = {}
-      for (const p of payments) {
-        if (!firstPayment[p.deal_id] || p.payment_date < firstPayment[p.deal_id]) {
-          firstPayment[p.deal_id] = p.payment_date
-        }
-      }
-      
-      // Calculate close times by salesperson
-      const closeTimesBySP: Record<string, number[]> = {}
-      for (const [dealId, paymentDate] of Object.entries(firstPayment)) {
-        const info = dealInfo[dealId]
-        if (!info || !info.salesperson || info.salesperson === 'Unassigned' || !info.startDate) continue
-        
-        const paid = new Date(paymentDate)
-        const diffMs = paid.getTime() - info.startDate.getTime()
-        
-        // Sanity check: 0+ days (same month is valid) and less than 1 year
-        if (diffMs >= 0 && diffMs < 365 * 24 * 60 * 60 * 1000) {
-          if (!closeTimesBySP[info.salesperson]) closeTimesBySP[info.salesperson] = []
-          closeTimesBySP[info.salesperson].push(diffMs)
-        }
-      }
-      
-      // Find fastest (lowest avg, min 2 closes)
-      let lowestAvgMs = Infinity
-      for (const [name, times] of Object.entries(closeTimesBySP)) {
-        if (times.length >= 2) {
-          const avgMs = times.reduce((a, b) => a + b, 0) / times.length
-          if (avgMs < lowestAvgMs) {
-            lowestAvgMs = avgMs
-            const days = Math.floor(avgMs / (1000 * 60 * 60 * 24))
-            const hours = Math.floor((avgMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-            const displayValue = days > 0 ? `${days}d ${hours}h` : `${hours}h`
-            fastestCloserLeader = { name, value: avgMs, displayValue }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Leaderboard Supabase error:', err)
-  }
-  
-  return {
-    dealsWon: dealsWonLeader,
-    totalCollections: collectionsLeader,
-    biggestPipeline: biggestPipelineLeader,
-    fastestCloser: fastestCloserLeader,
-  }
-}
-
-// Fetch Service field value for a contact
-async function fetchContactDealType(
-  contactId: string,
-  clinic: string,
-  token: string
-): Promise<string> {
-  try {
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/contacts/${contactId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-        },
-      }
-    )
-    
-    if (!response.ok) return ''
-    
-    const data = await response.json()
-    const serviceFieldId = SERVICE_FIELD_IDS[clinic]
-    const customFields = data.contact?.customFields || []
-    
-    const serviceField = customFields.find((f: { id: string; value: string }) => f.id === serviceFieldId)
-    return formatDealType(serviceField?.value)
-  } catch {
-    return ''
-  }
-}
-
-// Batch fetch deal types for multiple contacts (with concurrency limit)
-async function batchFetchDealTypes(
-  contacts: { contactId: string; clinic: string }[],
-  tokens: Record<string, string>
-): Promise<Record<string, string>> {
-  const results: Record<string, string> = {}
-  const BATCH_SIZE = 10 // Fetch 10 at a time to avoid rate limits
-  
-  for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
-    const batch = contacts.slice(i, i + BATCH_SIZE)
-    const batchResults = await Promise.all(
-      batch.map(async ({ contactId, clinic }) => {
-        const token = tokens[clinic]
-        if (!token) return { contactId, dealType: '' }
-        const dealType = await fetchContactDealType(contactId, clinic, token)
-        return { contactId, dealType }
-      })
-    )
-    
-    for (const { contactId, dealType } of batchResults) {
-      results[contactId] = dealType
-    }
-  }
-  
-  return results
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount)
 }
 
 export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const clinicFilter = searchParams.get('clinic')
+  const salespersonIds = searchParams.get('salespersonIds')?.split(',').filter(Boolean)
+
   try {
-    const { searchParams } = new URL(request.url)
-    const clinicFilter = searchParams.get('clinic') // TR01, TR02, TR04, or null for all
-    const salespersonFilter = searchParams.get('salesperson') // GHL user ID(s), comma-separated, or null for all
-    const salespersonIds = salespersonFilter ? salespersonFilter.split(',') : null
+    const supabase = getSupabase()
     
-    const clinicsToFetch = clinicFilter 
-      ? [clinicFilter as keyof typeof CLINIC_CONFIG]
-      : ['TR01', 'TR02', 'TR04'] as const
+    // Build query for opportunities
+    let query = supabase
+      .from('opportunities')
+      .select('*')
+      .order('name')
     
-    // Fetch opportunities and stage names from all clinics in parallel
-    const allData = await Promise.all(
-      clinicsToFetch.map(async (clinic) => {
-        const [opps, stageNames] = await Promise.all([
-          fetchGHLOpportunities(clinic),
-          fetchStageNames(clinic),
-        ])
-        return { clinic, opps, stageNames }
-      })
+    if (clinicFilter) {
+      query = query.eq('clinic', clinicFilter)
+    }
+    
+    if (salespersonIds && salespersonIds.length > 0) {
+      query = query.in('assigned_to_id', salespersonIds)
+    }
+    
+    const { data: opportunities, error } = await query
+    
+    if (error) {
+      console.error('Supabase query error:', error)
+      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
+    
+    // Fetch stage overrides (local changes not yet synced)
+    const { data: overrides } = await supabase
+      .from('stage_overrides')
+      .select('opportunity_id, super_stage')
+    const stageOverrideMap = new Map<string, SuperStage>(
+      (overrides || []).map(o => [o.opportunity_id, o.super_stage as SuperStage])
     )
     
-    // Flatten and transform to pipeline cards
-    const cards: PipelineCard[] = []
-    
-    for (const { clinic, opps, stageNames } of allData) {
-      for (const opp of opps) {
-        // Get stage name from ID, then map to super stage
-        const stageName = stageNames[opp.pipelineStageId] || ''
-        const superStage = getSuperStageByName(stageName)
+    // Transform to pipeline cards
+    const cards: PipelineCard[] = (opportunities || [])
+      .filter(opp => !opp.name.toLowerCase().includes('test'))
+      .map(opp => {
+        // Use stage override if present, otherwise use stored stage
+        const stage = stageOverrideMap.get(opp.id) || opp.super_stage as SuperStage
         
-        // Skip if not in our pipeline stages
-        if (!superStage) continue
-        
-        // Skip test records
-        if (opp.name.toLowerCase().includes('test')) continue
-        
-        // Skip if salesperson filter is set and doesn't match any of the IDs
-        if (salespersonIds && !salespersonIds.includes(opp.assignedTo)) continue
-        
-        cards.push({
+        return {
           id: opp.id,
           name: opp.name,
-          value: opp.monetaryValue || 0,
-          clinic: clinic,
-          stage: superStage,
-          ghlStageId: opp.pipelineStageId,
-          assignedToId: opp.assignedTo || null,
-          assignedTo: getSalespersonName(opp.assignedTo),
+          value: opp.monetary_value || 0,
+          clinic: opp.clinic,
+          stage,
+          ghlStageId: opp.ghl_stage_id || '',
+          assignedToId: opp.assigned_to_id,
+          assignedTo: opp.assigned_to_name || 'Unassigned',
           source: opp.source || 'Unknown',
-          dealType: '', // Will be populated below
-          daysInStage: calculateDaysInStage(opp.lastStageChangeAt),
-          contactId: opp.contactId,
-          email: opp.contact?.email,
-          phone: opp.contact?.phone,
-          tags: opp.contact?.tags || [],
-          createdAt: opp.createdAt,
-        })
-      }
-    }
-    
-    // Fetch deal types from Supabase (faster than GHL)
-    const contactIds = cards.map(c => c.contactId).filter(Boolean)
-    const dealTypes = await getDealTypesByContactIds(contactIds)
-    
-    // Update cards with deal types
-    for (const card of cards) {
-      card.dealType = dealTypes[card.contactId] || ''
-    }
-    
-    // Dedupe by contactId - keep the card furthest along in the pipeline
-    const cardsByContact = new Map<string, PipelineCard>()
-    for (const card of cards) {
-      const existing = cardsByContact.get(card.contactId)
-      if (!existing) {
-        cardsByContact.set(card.contactId, card)
-      } else {
-        // Keep the one with higher stage order (furthest along)
-        const existingOrder = STAGE_CONFIG[existing.stage].order
-        const currentOrder = STAGE_CONFIG[card.stage].order
-        if (currentOrder > existingOrder) {
-          cardsByContact.set(card.contactId, card)
+          dealType: opp.deal_type || '',
+          daysInStage: opp.days_in_stage || 0,
+          contactId: opp.contact_id || '',
+          email: opp.email,
+          phone: opp.phone,
+          tags: opp.tags || [],
+          createdAt: opp.created_at,
         }
-      }
-    }
-    const dedupedCards = Array.from(cardsByContact.values())
+      })
     
     // Group by stage
-    const pipeline: Record<SuperStage, PipelineCard[]> = {
-      virtual: [],
-      in_person: [],
-      tx_plan: [],
-      closing: [],
-      financing: [],
-      won: [],
-      archive: [],
-    }
-    
-    for (const card of dedupedCards) {
-      pipeline[card.stage].push(card)
-    }
-    
-    // Sort each stage by days in stage (oldest first = needs attention)
+    const pipeline: Record<SuperStage, PipelineCard[]> = {} as Record<SuperStage, PipelineCard[]>
     for (const stage of SUPER_STAGES) {
-      pipeline[stage].sort((a, b) => b.daysInStage - a.daysInStage)
+      pipeline[stage] = []
+    }
+    
+    for (const card of cards) {
+      if (pipeline[card.stage]) {
+        pipeline[card.stage].push(card)
+      }
     }
     
     // Calculate totals
     const totals = {
-      count: dedupedCards.length,
-      value: dedupedCards.reduce((sum, c) => sum + c.value, 0),
-      byStage: Object.fromEntries(
-        SUPER_STAGES.map(stage => [
-          stage,
-          {
-            count: pipeline[stage].length,
-            value: pipeline[stage].reduce((sum, c) => sum + c.value, 0),
-          }
-        ])
-      ),
+      count: cards.length,
+      value: cards.reduce((sum, c) => sum + c.value, 0),
+      byStage: {} as Record<SuperStage, { count: number; value: number }>,
     }
     
-    // Get unique salespersons for filter dropdown
-    const salespersons = Array.from(new Set(dedupedCards.map(c => c.assignedToId).filter(Boolean)))
-      .map(id => ({ id, name: getSalespersonName(id as string) }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    for (const stage of SUPER_STAGES) {
+      const stageCards = pipeline[stage]
+      totals.byStage[stage] = {
+        count: stageCards.length,
+        value: stageCards.reduce((sum, c) => sum + c.value, 0),
+      }
+    }
     
-    // Calculate leaderboard stats from pipeline data + Supabase
-    const leaderboard = await calculateLeaderboard(dedupedCards, pipeline)
+    // Calculate leaderboard stats
+    const leaderboard = await calculateLeaderboard(supabase)
     
-    return NextResponse.json({ pipeline, totals, salespersons, leaderboard })
+    // Get list of unique salespersons
+    const salespersonsMap = new Map<string, string>()
+    for (const card of cards) {
+      if (card.assignedToId && card.assignedTo && card.assignedTo !== 'Unassigned') {
+        salespersonsMap.set(card.assignedToId, card.assignedTo)
+      }
+    }
+    const salespersons = Array.from(salespersonsMap.entries()).map(([id, name]) => ({ id, name }))
+    
+    return NextResponse.json({
+      pipeline,
+      totals,
+      salespersons,
+      leaderboard,
+    })
   } catch (error) {
-    console.error('Pipeline API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch pipeline' }, { status: 500 })
+    console.error('Pipeline error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Move opportunity to a new stage
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { opportunityId, newStageId, clinic } = body
-    
-    if (!opportunityId || !newStageId || !clinic) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+async function calculateLeaderboard(supabase: ReturnType<typeof getSupabase>): Promise<LeaderboardStats> {
+  // Get deals won stats from deals table
+  const { data: wonDeals } = await supabase
+    .from('deals')
+    .select('salesperson, plan_total')
+  
+  // Get payments for collections
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('deal_id, amount, deals!inner(salesperson)')
+  
+  // Calculate deals won by salesperson
+  const dealsWonBySalesperson = new Map<string, number>()
+  for (const deal of wonDeals || []) {
+    const current = dealsWonBySalesperson.get(deal.salesperson) || 0
+    dealsWonBySalesperson.set(deal.salesperson, current + (deal.plan_total || 0))
+  }
+  
+  // Find top deals won
+  let topDealsWon = { name: '-', value: 0 }
+  Array.from(dealsWonBySalesperson.entries()).forEach(([name, value]) => {
+    if (value > topDealsWon.value) {
+      topDealsWon = { name, value }
     }
-    
-    const token = GHL_TOKENS[clinic as keyof typeof GHL_TOKENS]
-    if (!token) {
-      return NextResponse.json({ error: 'Invalid clinic' }, { status: 400 })
+  })
+  
+  // Calculate collections by salesperson
+  const collectionsBySalesperson = new Map<string, number>()
+  for (const payment of payments || []) {
+    const dealInfo = payment.deals as unknown as { salesperson: string } | null
+    const salesperson = dealInfo?.salesperson
+    if (salesperson) {
+      const current = collectionsBySalesperson.get(salesperson) || 0
+      collectionsBySalesperson.set(salesperson, current + (payment.amount || 0))
     }
-    
-    const response = await fetch(
-      `https://services.leadconnectorhq.com/opportunities/${opportunityId}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pipelineStageId: newStageId,
-        }),
-      }
-    )
-    
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('GHL update error:', error)
-      return NextResponse.json({ error: 'Failed to update stage' }, { status: 500 })
+  }
+  
+  // Find top collections
+  let topCollections = { name: '-', value: 0 }
+  Array.from(collectionsBySalesperson.entries()).forEach(([name, value]) => {
+    if (value > topCollections.value) {
+      topCollections = { name, value }
     }
-    
-    const updated = await response.json()
-    return NextResponse.json({ success: true, opportunity: updated })
-  } catch (error) {
-    console.error('Pipeline PATCH error:', error)
-    return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
+  })
+  
+  // Get biggest pipeline from opportunities
+  const { data: pipelineOpps } = await supabase
+    .from('opportunities')
+    .select('assigned_to_name, monetary_value')
+    .not('super_stage', 'eq', 'won')
+  
+  const pipelineBySalesperson = new Map<string, number>()
+  for (const opp of pipelineOpps || []) {
+    if (opp.assigned_to_name) {
+      const current = pipelineBySalesperson.get(opp.assigned_to_name) || 0
+      pipelineBySalesperson.set(opp.assigned_to_name, current + (opp.monetary_value || 0))
+    }
+  }
+  
+  let topPipeline = { name: '-', value: 0 }
+  Array.from(pipelineBySalesperson.entries()).forEach(([name, value]) => {
+    if (value > topPipeline.value) {
+      topPipeline = { name, value }
+    }
+  })
+  
+  // Fastest closer (placeholder - would need deal close dates)
+  const fastestCloser = { name: '-', value: 0, displayValue: '-' }
+  
+  return {
+    dealsWon: {
+      ...topDealsWon,
+      displayValue: formatCurrency(topDealsWon.value),
+    },
+    totalCollections: {
+      ...topCollections,
+      displayValue: formatCurrency(topCollections.value),
+    },
+    biggestPipeline: {
+      ...topPipeline,
+      displayValue: formatCurrency(topPipeline.value),
+    },
+    fastestCloser,
   }
 }

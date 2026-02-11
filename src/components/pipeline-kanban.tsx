@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, SALESPERSON_IDS } from '@/lib/pipeline-config'
-import { SyncIndicator } from './sync-indicator'
+// SyncIndicator moved to header
 import {
   DndContext,
   DragOverlay,
@@ -588,11 +588,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
           </div>
         )}
 
-        {/* Filters and Sync Status */}
-        <div className="flex gap-3 mb-4 items-center">
-          {/* Sync indicator on the left */}
-          <SyncIndicator />
-          <div className="flex-1" /> {/* Spacer to push filters right */}
+        {/* Filters */}
+        <div className="flex gap-3 mb-4 items-center justify-end">
           <input
             type="text"
             value={searchQuery}
