@@ -14,7 +14,14 @@ export function getSupabase(): SupabaseClient {
     },
     global: {
       headers: {
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+      fetch: (url, options = {}) => {
+        return fetch(url, {
+          ...options,
+          cache: 'no-store',
+        })
       },
     },
   })
