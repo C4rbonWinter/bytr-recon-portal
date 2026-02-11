@@ -561,7 +561,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         )}
 
         {/* Stats Cards */}
-        {isAdmin && leaderboard && data && (
+        {leaderboard && data && (
           <div className="grid grid-cols-5 gap-4 mb-4">
             <div className="bg-card p-4 rounded-lg border border-border hover:border-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Pipeline</div>
