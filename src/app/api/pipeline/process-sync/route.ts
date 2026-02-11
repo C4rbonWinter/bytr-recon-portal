@@ -6,6 +6,20 @@ import { CLINIC_CONFIG, SuperStage, STAGE_NAME_TO_SUPER } from '@/lib/pipeline-c
 
 export const dynamic = 'force-dynamic'
 
+// Service (deal type) custom field IDs per clinic
+const SERVICE_FIELD_IDS: Record<string, string> = {
+  TR01: 'QlA7Mso7jPC20Ng8wHyq',
+  TR02: 'IdlYaG597ASHeuoFeIuk',
+  TR04: 'fK1TUWuawPzN9pkkxEV7',
+}
+
+// Per-location API tokens (private integrations with full access)
+const LOCATION_TOKENS: Record<string, string> = {
+  TR01: process.env.GHL_TOKEN_TR01 || '',
+  TR02: process.env.GHL_TOKEN_TR02 || '',
+  TR04: process.env.GHL_TOKEN_TR04 || '',
+}
+
 // Target stage names for each super stage
 const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
   virtual: ['Virtual Consult', 'Virtual', 'Virtual Show'],
@@ -17,7 +31,53 @@ const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
   archive: ['Delayed Follow Up', 'Re Engage', 'Limbo'],
 }
 
-async function processMove(move: { id: string; opportunityId: string; clinic: string; toStage: string; attempts: number }): Promise<{ success: boolean; error?: string }> {
+async function processDealTypeChange(move: { id: string; opportunityId: string; clinic: string; toStage: string }): Promise<{ success: boolean; error?: string }> {
+  // opportunityId is actually contactId for deal type changes
+  const contactId = move.opportunityId
+  const dealType = move.toStage
+  const fieldId = SERVICE_FIELD_IDS[move.clinic]
+  const token = LOCATION_TOKENS[move.clinic]
+  
+  if (!fieldId) {
+    return { success: false, error: `No Service field ID for clinic ${move.clinic}` }
+  }
+  if (!token) {
+    return { success: false, error: `No API token for clinic ${move.clinic}` }
+  }
+  
+  try {
+    const response = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customFields: [{ id: fieldId, value: dealType }],
+        }),
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      return { success: false, error: `GHL contact update failed: ${response.status} - ${errorText}` }
+    }
+    
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: String(err) }
+  }
+}
+
+async function processMove(move: { id: string; opportunityId: string; clinic: string; fromStage: string; toStage: string; attempts: number }): Promise<{ success: boolean; error?: string }> {
+  // Handle deal type changes separately
+  if (move.fromStage === 'deal_type_change') {
+    return processDealTypeChange(move)
+  }
+  
   const clinicConfig = CLINIC_CONFIG[move.clinic as keyof typeof CLINIC_CONFIG]
   if (!clinicConfig) {
     return { success: false, error: 'Invalid clinic' }
