@@ -32,6 +32,7 @@ interface PipelineCard {
   ghlStageId: string
   assignedTo: string
   source: string
+  dealType: string
   daysInStage: number
   contactId: string
   email?: string
@@ -172,7 +173,7 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
       
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.source}</span>
+        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || card.source}</span>
       </div>
     </div>
   )
@@ -194,7 +195,7 @@ function CardOverlay({ card, showSalesperson }: { card: PipelineCard; showSalesp
       </div>
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.source}</span>
+        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || card.source}</span>
       </div>
     </div>
   )
@@ -558,6 +559,10 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">Days in Stage</span>
                   <DaysInStageBadge days={selectedCard.daysInStage} />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Deal Type</span>
+                  <span className="text-foreground">{selectedCard.dealType || '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">Source</span>

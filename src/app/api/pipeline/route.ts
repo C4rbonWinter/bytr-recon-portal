@@ -8,6 +8,19 @@ const GHL_TOKENS: Record<string, string> = {
   TR04: process.env.GHL_TOKEN_VEGAS || '',
 }
 
+// Service (deal type) custom field IDs per clinic
+const SERVICE_FIELD_IDS: Record<string, string> = {
+  TR01: 'QlA7Mso7jPC20Ng8wHyq',
+  TR02: 'IdlYaG597ASHeuoFeIuk',
+  TR04: 'fK1TUWuawPzN9pkkxEV7',
+}
+
+// Clean up deal type display (remove "Implants" as it's implied)
+function formatDealType(raw: string | null | undefined): string {
+  if (!raw) return ''
+  return raw.replace(/\s*Implants?$/i, '').trim()
+}
+
 interface GHLOpportunity {
   id: string
   name: string
@@ -39,6 +52,7 @@ interface PipelineCard {
   assignedToId: string | null
   assignedTo: string  // Display name
   source: string
+  dealType: string    // From GHL "Service" custom field
   daysInStage: number
   contactId: string
   email?: string
@@ -175,6 +189,63 @@ function calculateDaysInStage(lastStageChangeAt: string): number {
   return Math.floor(diffMs / (1000 * 60 * 60 * 24))
 }
 
+// Fetch Service field value for a contact
+async function fetchContactDealType(
+  contactId: string,
+  clinic: string,
+  token: string
+): Promise<string> {
+  try {
+    const response = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+        },
+      }
+    )
+    
+    if (!response.ok) return ''
+    
+    const data = await response.json()
+    const serviceFieldId = SERVICE_FIELD_IDS[clinic]
+    const customFields = data.contact?.customFields || []
+    
+    const serviceField = customFields.find((f: { id: string; value: string }) => f.id === serviceFieldId)
+    return formatDealType(serviceField?.value)
+  } catch {
+    return ''
+  }
+}
+
+// Batch fetch deal types for multiple contacts (with concurrency limit)
+async function batchFetchDealTypes(
+  contacts: { contactId: string; clinic: string }[],
+  tokens: Record<string, string>
+): Promise<Record<string, string>> {
+  const results: Record<string, string> = {}
+  const BATCH_SIZE = 10 // Fetch 10 at a time to avoid rate limits
+  
+  for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+    const batch = contacts.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.all(
+      batch.map(async ({ contactId, clinic }) => {
+        const token = tokens[clinic]
+        if (!token) return { contactId, dealType: '' }
+        const dealType = await fetchContactDealType(contactId, clinic, token)
+        return { contactId, dealType }
+      })
+    )
+    
+    for (const { contactId, dealType } of batchResults) {
+      results[contactId] = dealType
+    }
+  }
+  
+  return results
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -225,6 +296,7 @@ export async function GET(request: NextRequest) {
           assignedToId: opp.assignedTo || null,
           assignedTo: getSalespersonName(opp.assignedTo),
           source: opp.source || 'Unknown',
+          dealType: '', // Will be populated below
           daysInStage: calculateDaysInStage(opp.lastStageChangeAt),
           contactId: opp.contactId,
           email: opp.contact?.email,
@@ -233,6 +305,15 @@ export async function GET(request: NextRequest) {
           createdAt: opp.createdAt,
         })
       }
+    }
+    
+    // Batch fetch deal types from GHL contacts
+    const contactsToFetch = cards.map(c => ({ contactId: c.contactId, clinic: c.clinic }))
+    const dealTypes = await batchFetchDealTypes(contactsToFetch, GHL_TOKENS)
+    
+    // Update cards with deal types
+    for (const card of cards) {
+      card.dealType = dealTypes[card.contactId] || ''
     }
     
     // Group by stage
