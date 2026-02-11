@@ -412,6 +412,17 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
     }
   }, [selectedCard])
 
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedCard) {
+        setSelectedCard(null)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedCard])
+
   // Handle deal type change
   const handleDealTypeChange = async (newDealType: string) => {
     if (!selectedCard || newDealType === selectedCard.dealType) return

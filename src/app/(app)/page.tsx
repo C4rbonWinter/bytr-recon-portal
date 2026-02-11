@@ -555,6 +555,15 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose])
+
   // Search GHL as user types - only search selected clinic
   const searchPatients = async (query: string) => {
     if (query.length < 2) {
@@ -788,6 +797,15 @@ function DealDetailModal({
 
   // Track if there are unsaved changes
   const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '')
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [hasChanges, sharedWith, salesperson])
 
   // Smart save on close - check for changes and save them
   const handleClose = async () => {
