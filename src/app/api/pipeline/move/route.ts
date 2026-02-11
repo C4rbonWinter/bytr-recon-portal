@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLocationToken } from '@/lib/ghl-oauth'
 import { CLINIC_CONFIG, STAGE_NAME_TO_SUPER, SuperStage } from '@/lib/pipeline-config'
+
+// Static GHL tokens (Private Integration - don't rotate)
+function getGHLToken(clinic: string): string {
+  switch (clinic) {
+    case 'TR01': return process.env.GHL_TOKEN_SG || ''
+    case 'TR02': return process.env.GHL_TOKEN_IRV || ''
+    case 'TR04': return process.env.GHL_TOKEN_VEGAS || ''
+    default: return ''
+  }
+}
 
 // Target stage names for each super stage (first match will be used)
 const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
@@ -26,17 +35,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid clinic' }, { status: 400 })
     }
 
-    // Get location token via OAuth
-    const companyId = clinic === 'TR04' 
-      ? process.env.GHL_OAUTH_VEGAS_COMPANY_ID!
-      : process.env.GHL_OAUTH_SALESJET_COMPANY_ID!
-    
-    const tokenResult = await getLocationToken(companyId, clinicConfig.locationId)
-    if (!tokenResult.success || !tokenResult.accessToken) {
-      return NextResponse.json({ error: 'Failed to get GHL token' }, { status: 500 })
+    // Use static integration token (doesn't rotate like OAuth)
+    const accessToken = getGHLToken(clinic)
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Missing GHL token for clinic' }, { status: 500 })
     }
-
-    const accessToken = tokenResult.accessToken
 
     // Fetch pipeline stages for this location
     const pipelinesRes = await fetch(
@@ -115,8 +118,13 @@ export async function POST(request: NextRequest) {
 
     if (!updateRes.ok) {
       const errorText = await updateRes.text()
-      console.error('Failed to update opportunity:', errorText)
-      return NextResponse.json({ error: 'Failed to update opportunity' }, { status: 500 })
+      console.error('Failed to update opportunity:', errorText, 'Status:', updateRes.status)
+      return NextResponse.json({ 
+        error: 'Failed to update opportunity', 
+        status: updateRes.status,
+        details: errorText,
+        targetStageId 
+      }, { status: 500 })
     }
 
     const updatedOpp = await updateRes.json()

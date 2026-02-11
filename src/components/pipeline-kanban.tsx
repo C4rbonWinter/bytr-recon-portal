@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, SALESPERSON_IDS } from '@/lib/pipeline-config'
+import { SyncIndicator } from './sync-indicator'
 import {
   DndContext,
   DragOverlay,
@@ -394,27 +395,27 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       pipeline: newPipeline,
     })
     
-    // Update GHL
+    // Queue move for background sync (instead of real-time GHL update)
     setUpdating(cardId)
     try {
-      const response = await fetch('/api/pipeline/move', {
+      const response = await fetch('/api/pipeline/queue-move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           opportunityId: cardId,
           clinic: sourceCard.clinic,
-          targetStage,
+          fromStage: sourceStage,
+          toStage: targetStage,
         }),
       })
       
       if (!response.ok) {
-        throw new Error('Failed to update stage')
+        throw new Error('Failed to queue move')
       }
       
-      // Refresh to get accurate data
-      await fetchPipeline()
+      // Don't refresh - keep optimistic UI, sync happens in background
     } catch (err) {
-      console.error('Failed to move card:', err)
+      console.error('Failed to queue move:', err)
       // Revert on error
       await fetchPipeline()
     } finally {
@@ -587,8 +588,11 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
           </div>
         )}
 
-        {/* Filters - right justified */}
-        <div className="flex gap-3 mb-4 justify-end">
+        {/* Filters and Sync Status */}
+        <div className="flex gap-3 mb-4 items-center">
+          {/* Sync indicator on the left */}
+          <SyncIndicator />
+          <div className="flex-1" /> {/* Spacer to push filters right */}
           <input
             type="text"
             value={searchQuery}
