@@ -36,6 +36,29 @@ interface LeaderboardStats {
   fastestCloser: LeaderboardEntry
 }
 
+// Parse deal_month to a start-of-month date (more accurate than created_at which is import time)
+function parseDealMonth(dm: string | null): Date | null {
+  if (!dm) return null
+  // Formats: "Jan 2026", "Dec 2025", "2026-02"
+  const monthNames: Record<string, number> = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+  }
+  // Try "MMM YYYY" format
+  const match1 = dm.match(/^([A-Za-z]{3})\s+(\d{4})$/)
+  if (match1) {
+    const month = monthNames[match1[1]]
+    const year = parseInt(match1[2])
+    if (month !== undefined) return new Date(year, month, 1)
+  }
+  // Try "YYYY-MM" format
+  const match2 = dm.match(/^(\d{4})-(\d{2})$/)
+  if (match2) {
+    return new Date(parseInt(match2[1]), parseInt(match2[2]) - 1, 1)
+  }
+  return null
+}
+
 // Normalize salesperson names from various formats
 function normalizeSalesperson(value: string | null): string {
   if (!value) return 'Unassigned'
@@ -67,7 +90,7 @@ export async function GET(request: NextRequest) {
     // 1. Get deals data from Supabase (with payments for collection totals)
     const { data: deals, error: dealsError } = await supabase
       .from('deals')
-      .select('id, salesperson, status, created_at, updated_at')
+      .select('id, salesperson, status, created_at, updated_at, deal_month')
     
     if (dealsError) {
       console.error('Supabase error:', dealsError)
@@ -87,10 +110,11 @@ export async function GET(request: NextRequest) {
 
     // Build maps for deal data
     const dealSalesperson: Record<string, string> = {}
-    const dealCreatedAt: Record<string, string> = {}
+    const dealStartDate: Record<string, Date | null> = {}
     for (const deal of deals || []) {
       dealSalesperson[deal.id] = deal.salesperson
-      dealCreatedAt[deal.id] = deal.created_at
+      // Use deal_month (when deal was worked) rather than created_at (when imported)
+      dealStartDate[deal.id] = parseDealMonth(deal.deal_month)
     }
 
     // Calculate collections by salesperson from payments
@@ -127,13 +151,14 @@ export async function GET(request: NextRequest) {
         salesStats[sp].dealsWon++
       }
       
-      // Calculate time to first payment (lead assignment to first collection)
+      // Calculate time to first payment (deal start month to first collection)
       const firstPayment = firstPaymentByDeal[deal.id]
-      if (deal.created_at && firstPayment) {
-        const assigned = new Date(deal.created_at)
+      const dealStart = dealStartDate[deal.id]
+      if (dealStart && firstPayment) {
         const collected = new Date(firstPayment)
-        const diffMs = collected.getTime() - assigned.getTime()
-        if (diffMs >= 0 && diffMs < 365 * 24 * 60 * 60 * 1000) { // Sanity check: less than 1 year
+        const diffMs = collected.getTime() - dealStart.getTime()
+        // Allow 0 to 365 days (deal_month is start of month, payment may be same month)
+        if (diffMs >= 0 && diffMs < 365 * 24 * 60 * 60 * 1000) {
           salesStats[sp].closeTimesMs.push(diffMs)
         }
       }
