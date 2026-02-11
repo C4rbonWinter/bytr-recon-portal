@@ -739,7 +739,7 @@ function DealDetailModal({
   })
 
   // Track if there are unsaved changes
-  const hasChanges = sharedWith !== (deal.sharedWith || '') || salesperson !== deal.salesperson
+  const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '')
 
   // Smart save on close - check for changes and save them
   const handleClose = async () => {
@@ -748,8 +748,8 @@ function DealDetailModal({
       if (sharedWith !== (deal.sharedWith || '')) {
         changes.sharedWith = sharedWith || null
       }
-      if (salesperson !== deal.salesperson) {
-        changes.salesperson = salesperson
+      if ((salesperson || '') !== (deal.salesperson || '')) {
+        changes.salesperson = salesperson || ''
       }
       await onUpdateDeal(deal.id, changes)
     }
