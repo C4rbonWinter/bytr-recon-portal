@@ -618,7 +618,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4 border border-border">
         <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
           <h2 className="text-lg font-semibold dark:text-zinc-100">New Deal</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
@@ -825,7 +825,7 @@ function DealDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col border border-border">
         <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
           <div>
             <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
@@ -1046,7 +1046,7 @@ function DealDetailModal({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  className="flex-1 px-3 py-1.5 bg-foreground text-background rounded text-sm hover:bg-foreground/90 transition-colors"
                 >
                   Add Payment
                 </button>
