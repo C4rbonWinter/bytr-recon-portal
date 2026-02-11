@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPendingMoves, markSynced, markFailed } from '@/lib/sync-queue'
+import { getLocationToken } from '@/lib/ghl-oauth'
 import { CLINIC_CONFIG, SuperStage, STAGE_NAME_TO_SUPER } from '@/lib/pipeline-config'
 
 export const dynamic = 'force-dynamic'
-
-// GHL tokens (read from env)
-function getGHLToken(clinic: string): string {
-  switch (clinic) {
-    case 'TR01': return process.env.GHL_TOKEN_SG || ''
-    case 'TR02': return process.env.GHL_TOKEN_IRV || ''
-    case 'TR04': return process.env.GHL_TOKEN_VEGAS || ''
-    default: return ''
-  }
-}
 
 // Target stage names for each super stage
 const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
@@ -26,15 +17,17 @@ const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
 }
 
 async function processMove(move: { id: string; opportunityId: string; clinic: string; toStage: string; attempts: number }): Promise<{ success: boolean; error?: string }> {
-  const accessToken = getGHLToken(move.clinic)
-  if (!accessToken) {
-    return { success: false, error: 'Missing GHL token' }
-  }
-
   const clinicConfig = CLINIC_CONFIG[move.clinic as keyof typeof CLINIC_CONFIG]
   if (!clinicConfig) {
     return { success: false, error: 'Invalid clinic' }
   }
+
+  // Get OAuth token (auto-persists new refresh tokens)
+  const tokenResult = await getLocationToken('', clinicConfig.locationId)
+  if (!tokenResult.success || !tokenResult.accessToken) {
+    return { success: false, error: tokenResult.error || 'Failed to get GHL token' }
+  }
+  const accessToken = tokenResult.accessToken
 
   try {
     // Fetch pipeline stages

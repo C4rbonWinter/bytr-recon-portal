@@ -1,4 +1,5 @@
-// GHL OAuth helper - handles Company→Location token exchange and API calls
+// GHL OAuth helper - handles Company→Location token exchange with auto-persistence
+import { getSupabase } from './supabase'
 
 const GHL_API_BASE = 'https://services.leadconnectorhq.com';
 
@@ -22,22 +23,19 @@ interface LocationTokenResponse {
   locationId: string;
 }
 
-// Company (Agency) configs - refresh tokens stored in env vars
+// Company (Agency) configs
 interface CompanyConfig {
   companyId: string;
-  refreshTokenEnvVar: string;
   locations: string[]; // locationIds this company covers
 }
 
 const COMPANY_CONFIGS: Record<string, CompanyConfig> = {
   vegas: {
     companyId: 'wX6xVVyBQwLwMugrEdvR',
-    refreshTokenEnvVar: 'GHL_OAUTH_VEGAS_REFRESH',
     locations: ['1isaYfEkvNkyLH3XepI5'], // TR04 Las Vegas
   },
   salesjet: {
     companyId: 'VVkTNsveI02sHUrJ0gOM',
-    refreshTokenEnvVar: 'GHL_OAUTH_SALESJET_REFRESH',
     locations: ['cl9YH8PZgv32HEz5pIXT', 'DJfIuAH1tTxRRBEufitL'], // TR01 SG, TR02 Irvine
   },
 };
@@ -49,7 +47,7 @@ const LOCATION_TO_COMPANY: Record<string, keyof typeof COMPANY_CONFIGS> = {
   'DJfIuAH1tTxRRBEufitL': 'salesjet',   // TR02 Irvine
 };
 
-// Cache for tokens (in-memory per request for serverless)
+// In-memory cache for tokens (per-request in serverless)
 const companyTokenCache: Record<string, { token: string; expiresAt: number }> = {};
 const locationTokenCache: Record<string, { token: string; expiresAt: number }> = {};
 
@@ -64,20 +62,73 @@ function getClientCredentials() {
   return { clientId, clientSecret };
 }
 
+// Get refresh token from Supabase (with fallback to env vars for initial setup)
+async function getRefreshToken(companyKey: string): Promise<string | null> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('ghl_tokens')
+      .select('refresh_token')
+      .eq('id', companyKey)
+      .single();
+    
+    if (data?.refresh_token) {
+      return data.refresh_token;
+    }
+  } catch (err) {
+    console.log(`Token lookup failed for ${companyKey}, trying env var fallback`);
+  }
+  
+  // Fallback to env vars (for initial setup or if DB fails)
+  const envVarName = companyKey === 'vegas' ? 'GHL_OAUTH_VEGAS_REFRESH' : 'GHL_OAUTH_SALESJET_REFRESH';
+  return process.env[envVarName] || null;
+}
+
+// Save new tokens to Supabase after refresh
+async function saveTokens(
+  companyKey: string, 
+  companyId: string,
+  refreshToken: string, 
+  accessToken: string, 
+  expiresIn: number
+): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    
+    await supabase
+      .from('ghl_tokens')
+      .upsert({
+        id: companyKey,
+        company_id: companyId,
+        refresh_token: refreshToken,
+        access_token: accessToken,
+        access_token_expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      });
+    
+    console.log(`✓ Saved new tokens for ${companyKey}`);
+  } catch (err) {
+    console.error(`Failed to save tokens for ${companyKey}:`, err);
+    // Don't throw - we can still use the token even if save fails
+  }
+}
+
 // Step 1: Get Company-level access token using refresh token
 async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): Promise<string> {
   const config = COMPANY_CONFIGS[companyKey];
   const cacheKey = companyKey;
   
-  // Check cache (with 5 min buffer)
+  // Check memory cache (with 5 min buffer)
   const cached = companyTokenCache[cacheKey];
   if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cached.token;
   }
   
-  const refreshToken = process.env[config.refreshTokenEnvVar];
+  // Get refresh token from DB or env
+  const refreshToken = await getRefreshToken(companyKey);
   if (!refreshToken) {
-    throw new Error(`Missing refresh token for ${companyKey}`);
+    throw new Error(`No refresh token available for ${companyKey}`);
   }
   
   const { clientId, clientSecret } = getClientCredentials();
@@ -101,15 +152,16 @@ async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): 
   
   const data: TokenResponse = await response.json();
   
-  // Note: GHL rotates refresh tokens. In production, we'd need to persist the new one.
-  // For now, we'll rely on the company token to get location tokens each request.
+  // CRITICAL: Save the new refresh token (GHL rotates them!)
+  await saveTokens(companyKey, config.companyId, data.refresh_token, data.access_token, data.expires_in);
   
+  // Update memory cache
   companyTokenCache[cacheKey] = {
     token: data.access_token,
     expiresAt: Date.now() + data.expires_in * 1000,
   };
   
-  console.log(`Company token refreshed for ${companyKey}`);
+  console.log(`✓ Company token refreshed for ${companyKey}`);
   return data.access_token;
 }
 
@@ -117,7 +169,7 @@ async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): 
 async function getLocationAccessToken(locationId: string): Promise<string> {
   const cacheKey = locationId;
   
-  // Check cache (with 5 min buffer)
+  // Check memory cache (with 5 min buffer)
   const cached = locationTokenCache[cacheKey];
   if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
     return cached.token;
@@ -157,14 +209,14 @@ async function getLocationAccessToken(locationId: string): Promise<string> {
     expiresAt: Date.now() + data.expires_in * 1000,
   };
   
-  console.log(`Location token acquired for ${locationId}`);
+  console.log(`✓ Location token acquired for ${locationId}`);
   return data.access_token;
 }
 
 export async function updateOpportunity(
   locationId: string,
   opportunityId: string,
-  updates: { monetaryValue?: number; [key: string]: unknown }
+  updates: { monetaryValue?: number; pipelineStageId?: string; [key: string]: unknown }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const accessToken = await getLocationAccessToken(locationId);
@@ -192,8 +244,7 @@ export async function updateOpportunity(
       return { success: false, error: `GHL API error: ${response.status} - ${error}` };
     }
 
-    const result = await response.json();
-    console.log(`✓ GHL update success for ${opportunityId}: $${updates.monetaryValue}`);
+    console.log(`✓ GHL update success for ${opportunityId}`);
     return { success: true };
   } catch (error) {
     console.error(`GHL update exception for ${opportunityId}:`, error);
@@ -220,4 +271,33 @@ export async function getLocationToken(
   } catch (error) {
     return { success: false, error: String(error) };
   }
+}
+
+// Seed initial tokens from env vars to Supabase (run once during setup)
+export async function seedTokensFromEnv(): Promise<{ success: boolean; seeded: string[] }> {
+  const seeded: string[] = [];
+  
+  for (const [companyKey, config] of Object.entries(COMPANY_CONFIGS)) {
+    const envVarName = companyKey === 'vegas' ? 'GHL_OAUTH_VEGAS_REFRESH' : 'GHL_OAUTH_SALESJET_REFRESH';
+    const refreshToken = process.env[envVarName];
+    
+    if (refreshToken) {
+      try {
+        const supabase = getSupabase();
+        await supabase
+          .from('ghl_tokens')
+          .upsert({
+            id: companyKey,
+            company_id: config.companyId,
+            refresh_token: refreshToken,
+            updated_at: new Date().toISOString(),
+          });
+        seeded.push(companyKey);
+      } catch (err) {
+        console.error(`Failed to seed ${companyKey}:`, err);
+      }
+    }
+  }
+  
+  return { success: true, seeded };
 }
