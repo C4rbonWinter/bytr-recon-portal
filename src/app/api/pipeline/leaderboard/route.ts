@@ -13,11 +13,14 @@ function getSupabase() {
   )
 }
 
-// GHL API tokens
-const GHL_TOKENS: Record<string, string> = {
-  TR01: process.env.GHL_TOKEN_SG || '',
-  TR02: process.env.GHL_TOKEN_IRV || '',
-  TR04: process.env.GHL_TOKEN_VEGAS || '',
+// GHL API tokens - access lazily at runtime to ensure env vars are available
+function getGHLToken(clinic: string): string {
+  switch (clinic) {
+    case 'TR01': return process.env.GHL_TOKEN_SG || ''
+    case 'TR02': return process.env.GHL_TOKEN_IRV || ''
+    case 'TR04': return process.env.GHL_TOKEN_VEGAS || ''
+    default: return ''
+  }
 }
 
 interface LeaderboardEntry {
@@ -141,7 +144,7 @@ export async function GET(request: NextRequest) {
     const pipelineByPerson: Record<string, number> = {}
     
     for (const clinic of ['TR01', 'TR02', 'TR04'] as const) {
-      const token = GHL_TOKENS[clinic]
+      const token = getGHLToken(clinic)
       if (!token) {
         console.log(`Leaderboard: No GHL token for ${clinic}`)
         continue
