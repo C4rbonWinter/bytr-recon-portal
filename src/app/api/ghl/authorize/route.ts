@@ -11,12 +11,13 @@ export async function GET(request: NextRequest) {
   }
   
   // The redirect URI must match what's configured in the GHL app
-  const redirectUri = 'https://recon-staging-bytr.vercel.app/api/ghl/callback'
+  const redirectUri = 'https://recon-portal-bytr.vercel.app/api/ghl/callback'
   
   const scopes = [
     'opportunities.readonly',
     'opportunities.write',
     'contacts.readonly',
+    'contacts.write',  // Needed for deal_type custom field updates
     'locations.readonly',
   ].join(' ')
   

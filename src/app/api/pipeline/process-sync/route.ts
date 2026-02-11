@@ -13,12 +13,8 @@ const SERVICE_FIELD_IDS: Record<string, string> = {
   TR04: 'fK1TUWuawPzN9pkkxEV7',
 }
 
-// Per-location API tokens (private integrations with full access)
-const LOCATION_TOKENS: Record<string, string> = {
-  TR01: process.env.GHL_TOKEN_TR01 || '',
-  TR02: process.env.GHL_TOKEN_TR02 || '',
-  TR04: process.env.GHL_TOKEN_TR04 || '',
-}
+// Note: Contact updates now use OAuth tokens via getLocationToken()
+// instead of private integration tokens (which lacked contacts.write scope)
 
 // Target stage names for each super stage
 const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
@@ -36,13 +32,21 @@ async function processDealTypeChange(move: { id: string; opportunityId: string; 
   const contactId = move.opportunityId
   const dealType = move.toStage
   const fieldId = SERVICE_FIELD_IDS[move.clinic]
-  const token = LOCATION_TOKENS[move.clinic]
   
   if (!fieldId) {
     return { success: false, error: `No Service field ID for clinic ${move.clinic}` }
   }
-  if (!token) {
-    return { success: false, error: `No API token for clinic ${move.clinic}` }
+  
+  // Get clinic config for location ID
+  const clinicConfig = CLINIC_CONFIG[move.clinic as keyof typeof CLINIC_CONFIG]
+  if (!clinicConfig) {
+    return { success: false, error: `Invalid clinic: ${move.clinic}` }
+  }
+  
+  // Use OAuth token (has contacts.write scope) instead of private integration token
+  const tokenResult = await getLocationToken('', clinicConfig.locationId)
+  if (!tokenResult.success || !tokenResult.accessToken) {
+    return { success: false, error: tokenResult.error || 'Failed to get GHL OAuth token for contact update' }
   }
   
   try {
@@ -51,7 +55,7 @@ async function processDealTypeChange(move: { id: string; opportunityId: string; 
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${tokenResult.accessToken}`,
           'Version': '2021-07-28',
           'Content-Type': 'application/json',
         },
