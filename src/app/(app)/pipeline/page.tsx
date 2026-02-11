@@ -22,11 +22,16 @@ const VIEW_AS_OPTIONS = USERS.map(u => ({ id: u.id, name: u.name }))
 
 export default function PipelinePage() {
   const [currentUser, setCurrentUser] = useState(USERS[0])
+  const [refreshKey, setRefreshKey] = useState(0)
   
   const isAdmin = currentUser.role === 'Admin'
 
   const handleViewAsChange = (id: string) => {
     setCurrentUser(USERS.find(u => u.id === id) || USERS[0])
+  }
+
+  const handleRefresh = () => {
+    setRefreshKey(k => k + 1)
   }
 
   return (
@@ -35,6 +40,7 @@ export default function PipelinePage() {
         viewAsOptions={VIEW_AS_OPTIONS}
         currentViewAs={currentUser.id}
         onViewAsChange={handleViewAsChange}
+        onRefresh={handleRefresh}
       />
 
       {/* Main Content */}
@@ -45,6 +51,7 @@ export default function PipelinePage() {
           </div>
         )}
         <PipelineKanban 
+          key={refreshKey}
           salespersonIds={isAdmin ? undefined : currentUser.ghlUserIds}
           isAdmin={isAdmin}
         />

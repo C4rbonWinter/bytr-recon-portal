@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, SALESPERSON_IDS } from '@/lib/pipeline-config'
 import {
   DndContext,
@@ -66,6 +67,19 @@ interface PipelineData {
     byStage: Record<SuperStage, { count: number; value: number }>
   }
   salespersons: Salesperson[]
+}
+
+interface LeaderboardEntry {
+  name: string
+  value: number
+  displayValue: string
+}
+
+interface LeaderboardStats {
+  dealsWon: LeaderboardEntry
+  totalCollections: LeaderboardEntry
+  biggestPipeline: LeaderboardEntry
+  fastestCloser: LeaderboardEntry
 }
 
 function formatCurrency(amount: number): string {
@@ -185,7 +199,7 @@ function DraggableCard({ card, onClick, showSalesperson, isDragging }: {
       
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || '—'}</span>
+        {card.dealType && <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType}</span>}
       </div>
     </div>
   )
@@ -207,7 +221,7 @@ function CardOverlay({ card, showSalesperson }: { card: PipelineCard; showSalesp
       </div>
       <div className="flex justify-between items-center text-xs text-muted-foreground">
         {showSalesperson && <span className="truncate">{card.assignedTo}</span>}
-        <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType || '—'}</span>
+        {card.dealType && <span className={`truncate ${showSalesperson ? 'ml-2' : ''}`}>{card.dealType}</span>}
       </div>
     </div>
   )
@@ -284,10 +298,12 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   const [savingDealType, setSavingDealType] = useState(false)
   const [clinicFilter, setClinicFilter] = useState<string>('')
   const [salespersonFilter, setSalespersonFilter] = useState<string>(salespersonIds?.join(',') || '')
+  const [monthFilter, setMonthFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('days_asc')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [activeCard, setActiveCard] = useState<PipelineCard | null>(null)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardStats | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -319,6 +335,18 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
     }
   }
 
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch('/api/pipeline/leaderboard')
+      if (response.ok) {
+        const data = await response.json()
+        setLeaderboard(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch leaderboard:', err)
+    }
+  }
+
   useEffect(() => {
     if (salespersonIds && salespersonIds.length > 0) {
       setSalespersonFilter(salespersonIds.join(','))
@@ -327,6 +355,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   
   useEffect(() => {
     fetchPipeline()
+    fetchLeaderboard()
   }, [clinicFilter, salespersonFilter])
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -484,20 +513,34 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
 
   if (!data) return null
 
-  // Filter pipeline data by search query
-  const filteredPipeline = searchQuery
-    ? Object.fromEntries(
-        Object.entries(data.pipeline).map(([stage, cards]) => [
-          stage,
-          (cards as PipelineCard[]).filter(card => 
-            card.name.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        ])
-      ) as Record<SuperStage, PipelineCard[]>
-    : data.pipeline
+  // Get all cards for calculating available months
+  const allCards = Object.values(data.pipeline).flat()
+  
+  // Calculate available months from card creation dates
+  const availableMonths = Array.from(
+    new Set(allCards.map(card => card.createdAt?.slice(0, 7)).filter(Boolean))
+  ).sort().reverse() // Most recent first
+  
+  // Filter pipeline data by search query and month
+  const filteredPipeline = Object.fromEntries(
+    Object.entries(data.pipeline).map(([stage, cards]) => [
+      stage,
+      (cards as PipelineCard[]).filter(card => {
+        // Search filter
+        if (searchQuery && !card.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false
+        }
+        // Month filter
+        if (monthFilter !== 'all' && card.createdAt?.slice(0, 7) !== monthFilter) {
+          return false
+        }
+        return true
+      })
+    ])
+  ) as Record<SuperStage, PipelineCard[]>
 
-  // Recalculate totals
-  const filteredTotals = searchQuery
+  // Recalculate totals based on filtered data
+  const filteredTotals = (searchQuery || monthFilter !== 'all')
     ? {
         count: Object.values(filteredPipeline).flat().length,
         value: Object.values(filteredPipeline).flat().reduce((sum, card) => sum + card.value, 0),
@@ -522,63 +565,90 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-foreground tracking-tight">Pipeline</h2>
-            <div className="text-sm text-muted-foreground">
-              {filteredTotals.count} opportunities · {formatCurrency(filteredTotals.value)} total
-            </div>
             {updating && (
               <span className="text-xs text-muted-foreground animate-pulse">Updating...</span>
             )}
           </div>
-          
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search patient..."
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground placeholder:text-muted-foreground w-40 focus:ring-2 focus:ring-zinc-400/30 focus:border-zinc-400 outline-none"
-            />
+        </div>
+
+        {/* Stats Cards */}
+        {isAdmin && leaderboard && (
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-chart-5/20 transition-colors">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Deals Won</div>
+              <div className="text-2xl font-bold text-chart-5 tracking-tight">{leaderboard.dealsWon.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.dealsWon.name}</div>
+            </div>
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-chart-4/20 transition-colors">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Total Collections</div>
+              <div className="text-2xl font-bold text-chart-4 tracking-tight">{leaderboard.totalCollections.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.totalCollections.name}</div>
+            </div>
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-success/20 transition-colors">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Biggest Pipeline</div>
+              <div className="text-2xl font-bold text-success tracking-tight">{leaderboard.biggestPipeline.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.biggestPipeline.name}</div>
+            </div>
+            <div className="bg-card p-4 rounded-lg border border-border hover:border-primary/20 transition-colors">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Fastest Closer</div>
+              <div className="text-2xl font-bold text-primary tracking-tight">{leaderboard.fastestCloser.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.fastestCloser.name}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Filters - right justified */}
+        <div className="flex gap-3 mb-4 justify-end">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search patient..."
+            className="border border-border rounded-lg px-3 py-2 text-sm bg-secondary text-foreground placeholder:text-muted-foreground w-48 focus:ring-2 focus:ring-zinc-400/30 focus:border-zinc-400 outline-none"
+          />
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
+          >
+            <option value="all">All Months</option>
+            {availableMonths.map(month => {
+              const [year, m] = month.split('-')
+              const displayName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
+              return <option key={month} value={month}>{displayName}</option>
+            })}
+          </select>
+          <select
+            value={clinicFilter}
+            onChange={(e) => setClinicFilter(e.target.value)}
+            className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
+          >
+            <option value="">All Clinics</option>
+            <option value="TR01">TR01 (SG)</option>
+            <option value="TR02">TR02 (IRV)</option>
+            <option value="TR04">TR04 (LV)</option>
+          </select>
+          {isAdmin && (
             <select
-              value={clinicFilter}
-              onChange={(e) => setClinicFilter(e.target.value)}
+              value={salespersonFilter}
+              onChange={(e) => setSalespersonFilter(e.target.value)}
               className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
             >
-              <option value="">All Clinics</option>
-              <option value="TR01">TR01 (SG)</option>
-              <option value="TR02">TR02 (IRV)</option>
-              <option value="TR04">TR04 (LV)</option>
-            </select>
-            
-            {isAdmin && (
-              <select
-                value={salespersonFilter}
-                onChange={(e) => setSalespersonFilter(e.target.value)}
-                className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
-              >
-                <option value="">All Salespeople</option>
-                {ALL_SALESPEOPLE.map(sp => (
-                  <option key={sp.name} value={sp.ids}>{sp.name}</option>
-                ))}
-              </select>
-            )}
-            
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
-            >
-              {SORT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option value="">All Salespeople</option>
+              {ALL_SALESPEOPLE.map(sp => (
+                <option key={sp.name} value={sp.ids}>{sp.name}</option>
               ))}
             </select>
-            
-            <button
-              onClick={fetchPipeline}
-              className="px-3 py-2 text-sm bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors font-medium"
-            >
-              Refresh
-            </button>
-          </div>
+          )}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
+          >
+            {SORT_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Kanban Board */}

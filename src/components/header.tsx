@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { Bell } from 'lucide-react'
+import { Bell, RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
 
@@ -23,6 +23,7 @@ interface UnverifiedPayment {
 
 interface HeaderProps {
   onNewDeal?: () => void
+  onRefresh?: () => void
   viewAsOptions?: ViewAsOption[]
   currentViewAs?: string
   onViewAsChange?: (id: string) => void
@@ -30,7 +31,7 @@ interface HeaderProps {
   onPaymentClick?: (dealId: string) => void
 }
 
-export function Header({ onNewDeal, viewAsOptions, currentViewAs, onViewAsChange, unverifiedPayments = [], onPaymentClick }: HeaderProps) {
+export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onViewAsChange, unverifiedPayments = [], onPaymentClick }: HeaderProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [showNotifications, setShowNotifications] = useState(false)
@@ -144,6 +145,17 @@ export function Header({ onNewDeal, viewAsOptions, currentViewAs, onViewAsChange
               className="bg-foreground text-background px-4 py-1.5 rounded-lg hover:bg-foreground/90 transition text-sm font-medium"
             >
               + New Deal
+            </button>
+          )}
+          
+          {/* Refresh Button - shown on Pipeline page */}
+          {onRefresh && isPipeline && (
+            <button
+              onClick={onRefresh}
+              className="bg-foreground text-background px-4 py-1.5 rounded-lg hover:bg-foreground/90 transition text-sm font-medium flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
             </button>
           )}
           

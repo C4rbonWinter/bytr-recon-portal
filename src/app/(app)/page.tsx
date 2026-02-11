@@ -858,7 +858,7 @@ function DealDetailModal({
           <div>
             <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500 dark:text-zinc-400">
-              {deal.dealType && <span>{formatDealType(deal.dealType)}</span>}
+              {deal.dealType && deal.dealType !== 'Other' && <span>{formatDealType(deal.dealType)}</span>}
               <ClinicBadge clinic={deal.clinic} />
               {!isSalesperson && <span>{getSalespersonDisplay(deal.salesperson)}</span>}
             </div>
