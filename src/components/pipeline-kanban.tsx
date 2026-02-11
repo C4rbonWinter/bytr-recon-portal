@@ -757,14 +757,9 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                 </a>
                 <button
                   onClick={() => setSelectedCard(null)}
-                  disabled={savingDealType}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors font-medium ${
-                    savingDealType 
-                      ? 'bg-yellow-600 text-white cursor-wait' 
-                      : 'bg-foreground text-background hover:bg-foreground/90'
-                  }`}
+                  className="flex-1 px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors font-medium"
                 >
-                  {savingDealType ? 'Saving...' : 'Close'}
+                  Close
                 </button>
               </div>
             </div>
