@@ -148,5 +148,5 @@ export const SALESPERSON_IDS: Record<string, string[]> = {
 
 export function getSalespersonName(ghlUserId: string | null): string {
   if (!ghlUserId) return 'Unassigned'
-  return GHL_USER_MAPPING[ghlUserId] || 'Unknown'
+  return GHL_USER_MAPPING[ghlUserId] || 'Unassigned'
 }
