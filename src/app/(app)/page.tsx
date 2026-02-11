@@ -110,6 +110,16 @@ const ClinicBadge = ({ clinic }: { clinic: string }) => (
   </span>
 )
 
+// Format deal type for display (snake_case → Title Case, remove "Implants")
+function formatDealType(raw: string | null | undefined): string {
+  if (!raw) return ''
+  // Convert snake_case to spaces, then title case
+  const spaced = raw.replace(/_/g, ' ')
+  const titled = spaced.replace(/\b\w/g, c => c.toUpperCase())
+  // Remove "Implants" suffix as it's implied
+  return titled.replace(/\s*Implants?$/i, '').trim()
+}
+
 const StatusIcon = ({ status }: { status: string }) => {
   switch (status) {
     case 'verified':
@@ -848,7 +858,7 @@ function DealDetailModal({
           <div>
             <h2 className="text-lg font-semibold dark:text-zinc-100">{deal.patientName}</h2>
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500 dark:text-zinc-400">
-              {deal.dealType && <span>{deal.dealType}</span>}
+              {deal.dealType && <span>{formatDealType(deal.dealType)}</span>}
               <ClinicBadge clinic={deal.clinic} />
               {!isSalesperson && <span>{getSalespersonDisplay(deal.salesperson)}</span>}
             </div>
