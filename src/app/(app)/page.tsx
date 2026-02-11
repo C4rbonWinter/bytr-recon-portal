@@ -679,7 +679,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
               </div>
             )}
             {formData.invoiceLink && (
-              <div className="mt-1 text-xs text-green-600">Invoice linked from GHL</div>
+              <div className="mt-1 text-xs text-success">Invoice linked from GHL</div>
             )}
           </div>
           {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
@@ -854,15 +854,15 @@ function DealDetailModal({
               </div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total</div>
             </div>
-            <div className="text-center p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
-              <div className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(deal.collected)}</div>
+            <div className="text-center p-3 bg-success/10 rounded-lg">
+              <div className="text-lg font-bold text-success">{formatCurrency(deal.collected)}</div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Collected</div>
             </div>
             <div className={`text-center p-3 rounded-lg ${
-              balance === 0 ? 'bg-success/10' : deal.collected === 0 ? 'bg-primary/10' : 'bg-chart-1/10'
+              balance === 0 ? 'bg-purple-500/10' : deal.collected === 0 ? 'bg-primary/10' : 'bg-chart-1/10'
             }`}>
               <div className={`text-lg font-bold ${
-                balance === 0 ? 'text-success' : deal.collected === 0 ? 'text-primary' : 'text-chart-1'
+                balance === 0 ? 'text-purple-500' : deal.collected === 0 ? 'text-primary' : 'text-chart-1'
               }`}>{formatCurrency(balance)}</div>
               <div className="text-xs text-gray-500 dark:text-zinc-400">Balance</div>
             </div>
