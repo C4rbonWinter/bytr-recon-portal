@@ -19,6 +19,8 @@ const GHL_USER_MAPPING: Record<string, string> = {
   'qdkCS02nCbZhGmn0R8zE': 'Scot',
   '1pShLvH7qVgRjaMVp80p': 'Jake',
   'drbfnr6OcLkSfSSxgev0': 'Blake',
+  // Setters (map to Unassigned since they're not closers)
+  'MIiKkoPZmR9h4ueKFjoY': 'Unassigned', // Monica (setter)
 }
 
 function getSalespersonDisplay(value: string | null): string {
