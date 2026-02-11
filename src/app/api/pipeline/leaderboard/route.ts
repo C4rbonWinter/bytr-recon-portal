@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSalespersonName, SALESPERSON_IDS, CLINIC_CONFIG } from '@/lib/pipeline-config'
 
+// Force dynamic rendering (not static) so env vars are available at runtime
+export const dynamic = 'force-dynamic'
+
 // Create Supabase client lazily to avoid build-time errors
 function getSupabase() {
   return createClient(
