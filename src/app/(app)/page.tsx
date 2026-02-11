@@ -749,7 +749,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="w-full px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors"
             >
               Create Deal
             </button>
@@ -1058,7 +1058,7 @@ function DealDetailModal({
         <div className="p-4 border-t dark:border-zinc-700">
           <button
             onClick={handleClose}
-            className={`w-full px-4 py-2 rounded-lg ${hasChanges ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700 dark:text-zinc-100'}`}
+            className={`w-full px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-foreground text-background hover:bg-foreground/90' : 'border dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700 dark:text-zinc-100'}`}
           >
             {hasChanges ? 'Save' : 'Close'}
           </button>

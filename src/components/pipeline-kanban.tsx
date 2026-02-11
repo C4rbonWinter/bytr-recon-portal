@@ -602,7 +602,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                   href={`https://app.gohighlevel.com/contacts/${selectedCard.contactId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full text-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                  className="block w-full text-center px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-colors font-medium"
                 >
                   Open in GHL
                 </a>
