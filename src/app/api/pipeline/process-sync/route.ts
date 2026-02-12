@@ -24,7 +24,7 @@ const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
   closing: ['Closing Call', 'Negotiation'],
   financing: ['Finance Link Sent', 'Approved', 'PP Processing', 'Cash Patient'],
   won: ['Signed', 'Down Payment', 'Won', 'Closed'],
-  archive: ['Delayed Follow Up', 'Re Engage', 'Limbo'],
+  cold: ['Delayed Follow Up', 'Re Engage', 'Limbo', 'No Show', 'No show OC', 'No show CC', 'Virtual No Show', 'Office No Show'],
 }
 
 async function processDealTypeChange(move: { id: string; opportunityId: string; clinic: string; toStage: string }): Promise<{ success: boolean; error?: string }> {
@@ -149,7 +149,7 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
 
     if (!targetStageId) {
       // Archive has no GHL equivalent - just mark as synced (local-only move)
-      if (move.toStage === 'archive') {
+      if (move.toStage === 'cold') {
         console.log(`Archive move for ${move.opportunityId} - no GHL stage, marking synced locally`)
         return { success: true }
       }

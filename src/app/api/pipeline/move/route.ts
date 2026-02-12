@@ -19,7 +19,7 @@ const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
   closing: ['Closing Call', 'Negotiation'],
   financing: ['Finance Link Sent', 'Approved', 'PP Processing', 'Cash Patient'],
   won: ['Signed', 'Down Payment', 'Won', 'Closed'],
-  archive: ['Delayed Follow Up', 'Re Engage', 'Limbo'],
+  cold: ['Delayed Follow Up', 'Re Engage', 'Limbo', 'No Show', 'No show OC', 'No show CC', 'Virtual No Show', 'Office No Show'],
 }
 
 export async function POST(request: NextRequest) {

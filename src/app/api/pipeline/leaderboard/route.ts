@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
       if (opp.super_stage === 'won') {
         if (!dealsWonByPerson[sp]) dealsWonByPerson[sp] = 0
         dealsWonByPerson[sp]++
-      } else if (opp.super_stage !== 'archive') {
+      } else if (opp.super_stage !== 'cold') {
         if (!pipelineCountByPerson[sp]) pipelineCountByPerson[sp] = 0
         pipelineCountByPerson[sp]++
       }

@@ -1,7 +1,7 @@
 // Pipeline Stage Configuration
-// Maps GHL stage IDs to our simplified super stages
+// Maps GHL stage IDs and tags to our kanban columns
 
-export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won', 'archive'] as const
+export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won', 'cold'] as const
 export type SuperStage = typeof SUPER_STAGES[number]
 
 export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; order: number }> = {
@@ -11,7 +11,51 @@ export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; ord
   closing: { name: 'Closing', color: 'bg-orange-100 dark:bg-orange-900/30', order: 3 },
   financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 4 },
   won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 5 },
-  archive: { name: 'Archive', color: 'bg-gray-100 dark:bg-gray-800/50', order: 6 },
+  cold: { name: 'Cold', color: 'bg-gray-100 dark:bg-gray-800/50', order: 6 },
+}
+
+// Days without significant tag changes before marking as Cold
+export const COLD_THRESHOLD_DAYS = 20
+
+// Tags that indicate significant activity (resets the cold timer)
+export const SIGNIFICANT_TAGS = new Set([
+  'activelead',
+  'contactreply',
+  'inofficeappt',
+  'fa-inofficeconsult',
+  'fa-virtualconsult',
+  'fa-closingconsult',
+  'txready',
+  'pt-agreement-signed',
+  'confirm-call1',
+  'confirm-call2',
+  'cc-confirm',
+])
+
+// Tag → Super Stage mapping (takes precedence over stage)
+export const TAG_TO_SUPER: Record<string, SuperStage> = {
+  // Virtual
+  'fa-virtualconsult': 'virtual',
+  'followupschedulevirtual': 'virtual',
+  
+  // In-Person
+  'fa-inofficeconsult': 'in_person',
+  'inofficeappt': 'in_person',
+  
+  // TX Plan
+  'txready': 'tx_plan',
+  
+  // Closing
+  'fa-closingconsult': 'closing',
+  
+  // Financing
+  'pt-agreement-signed': 'financing',
+  'cherrydenial': 'financing',  // needs attention - financing fell through
+  
+  // Cold (no-shows and stalled)
+  'vc-noshow': 'cold',
+  'cc-noshow': 'cold',
+  'stop bot': 'cold',
 }
 
 // Stage NAME → Super Stage mapping (works across all clinics)
@@ -55,35 +99,57 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   'finance option yes': 'financing',
   'patient preferred link': 'financing',
   'eligible': 'financing',
+  'down payment': 'financing',
+  'down payment ': 'financing',
   
-  // Won (down payment received = truly closed)
-  'down payment': 'won',
-  'down payment ': 'won',
+  // Won (financials completed = truly closed)
+  'financials completed': 'won',
   'won': 'won',
   'closed': 'won',
   'sold': 'won',
+  'smile design': 'won',
+  'pre surgery': 'won',
+  'surgery': 'won',
+  'surgery completed': 'won',
+  'after care': 'won',
+  'testimonial': 'won',
   
-  // Archive (cold leads that can be revived)
-  'delayed follow up': 'archive',
-  're engage': 'archive',
-  're-engage': 'archive',
-  'limbo': 'archive',
-  'rescheduled': 'archive',
+  // Cold (no-shows, stalled, lost)
+  'no show': 'cold',
+  'no show oc': 'cold',
+  'no show cc': 'cold',
+  'virtual no show': 'cold',
+  'office no show': 'cold',
+  'delayed follow up': 'cold',
+  're engage': 'cold',
+  're-engage': 'cold',
+  'limbo': 'cold',
+  'rescheduled': 'cold',
+  'lost': 'cold',
+  'not interested': 'cold',
+  'fico dnq': 'cold',
+  'pp dnq': 'cold',
+  'un qualified': 'cold',
 }
 
-// Stage names to exclude (lost, too early, or post-close)
+// Stage names to exclude completely (too early in funnel)
 export const EXCLUDED_STAGE_NAMES = new Set([
-  // Lost/stalled (truly dead)
-  'lost', 'not interested', 'fico dnq', 'pp dnq', 'un qualified',
-  'no show', 'no show oc', 'no show cc',
-  // Too early
   'activated', 'new lead from lp', 'new lead', 'lead created', 'un scheduled',
-  // Post-close (already a Deal)
-  'smile design', 'financials completed', 'pre surgery', 'surgery', 
-  'surgery completed', 'after care', 'recall', 'testimonial',
-  // Other exclusions
-  'uncategorized',
+  'pre-qual', 'uncategorized', 'recall',
 ])
+
+// Get super stage from tags (returns first match, or null)
+export function getSuperStageByTags(tags: string[]): SuperStage | null {
+  if (!tags || tags.length === 0) return null
+  
+  for (const tag of tags) {
+    const normalized = tag.toLowerCase().trim()
+    if (TAG_TO_SUPER[normalized]) {
+      return TAG_TO_SUPER[normalized]
+    }
+  }
+  return null
+}
 
 // Get super stage from stage NAME (case-insensitive)
 export function getSuperStageByName(stageName: string): SuperStage | null {
@@ -94,13 +160,59 @@ export function getSuperStageByName(stageName: string): SuperStage | null {
   return STAGE_NAME_TO_SUPER[normalized] || null
 }
 
+// Check if a deal should be marked cold based on last activity
+export function shouldBeCold(lastActivityDate: Date | string | null): boolean {
+  if (!lastActivityDate) return true  // No activity = cold
+  
+  const lastActivity = typeof lastActivityDate === 'string' 
+    ? new Date(lastActivityDate) 
+    : lastActivityDate
+  
+  const now = new Date()
+  const daysSinceActivity = Math.floor(
+    (now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
+  )
+  
+  return daysSinceActivity > COLD_THRESHOLD_DAYS
+}
+
+// Determine super stage: Tags take precedence, then stage, then cold check
+export function determineSuperStage(
+  stageName: string | null,
+  tags: string[],
+  lastActivityDate: Date | string | null
+): SuperStage | null {
+  // 1. Check tags first (most specific signal)
+  const tagStage = getSuperStageByTags(tags)
+  if (tagStage) return tagStage
+  
+  // 2. Check stage name
+  if (stageName) {
+    const stageResult = getSuperStageByName(stageName)
+    if (stageResult) {
+      // If deal is in an active stage but hasn't had activity in 20+ days, mark cold
+      if (stageResult !== 'won' && stageResult !== 'cold' && shouldBeCold(lastActivityDate)) {
+        return 'cold'
+      }
+      return stageResult
+    }
+  }
+  
+  // 3. No stage match and no recent activity = cold
+  if (shouldBeCold(lastActivityDate)) {
+    return 'cold'
+  }
+  
+  return null
+}
+
 // Clinic configs with key pipeline IDs for fetching later-stage deals
 export const CLINIC_CONFIG = {
   TR01: { 
     locationId: 'cl9YH8PZgv32HEz5pIXT', 
     name: 'San Gabriel', 
     tokenKey: 'ghl-api-sg',
-    salesPipelineId: 'PI6UfhZ4zXZn9WsZMPtX',  // "2 Sales Stages" - has TX Plan, Closing, Signed
+    salesPipelineId: 'PI6UfhZ4zXZn9WsZMPtX',  // "2 Sales Stages"
   },
   TR02: { 
     locationId: 'DJfIuAH1tTxRRBEufitL', 
@@ -117,7 +229,6 @@ export const CLINIC_CONFIG = {
 } as const
 
 // GHL User ID → Salesperson Name mapping
-// Two GHL instances: Sales Jet (SG + Irvine) and Teeth+Robots (Vegas)
 export const GHL_USER_MAPPING: Record<string, string> = {
   // Sales Jet instance (TR01 SG + TR02 Irvine)
   'xGHzefX0G70ObVhtULtS': 'Josh',
@@ -136,7 +247,7 @@ export const GHL_USER_MAPPING: Record<string, string> = {
   'drbfnr6OcLkSfSSxgev0': 'Blake',
 }
 
-// Salesperson name → all their GHL user IDs (for filtering across instances)
+// Salesperson name → all their GHL user IDs
 export const SALESPERSON_IDS: Record<string, string[]> = {
   'Josh': ['xGHzefX0G70ObVhtULtS', 'cnHNqiEGjpOOWVzsZnJe'],
   'Chris': ['W02cGzjo8DOEvq3EnNH5', 'MH14SnZ7liJIMIBd2mge'],

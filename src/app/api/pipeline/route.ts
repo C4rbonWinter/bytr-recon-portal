@@ -238,7 +238,7 @@ async function calculateLeaderboard(supabase: ReturnType<typeof getSupabase>): P
   const { data: pipelineOpps } = await supabase
     .from('opportunities')
     .select('assigned_to_name')
-    .not('super_stage', 'in', '("won","archive")')
+    .not('super_stage', 'in', '("won","cold")')
   
   const pipelineCountBySalesperson = new Map<string, number>()
   for (const opp of pipelineOpps || []) {
