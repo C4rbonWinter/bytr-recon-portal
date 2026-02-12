@@ -77,7 +77,7 @@ export async function getDeals(): Promise<(Deal & { collected: number; payments:
   if (dealsError) throw dealsError
 
   // Filter out test records and specific test names
-  const excludeNames = ['test', 'josh summers', 'joshua summers']
+  const excludeNames = ['test', 'josh summers', 'joshua summers', 'blake sales']
   const filteredDeals = (deals || []).filter(deal => {
     const nameLower = (deal.patient_name || '').toLowerCase()
     return !excludeNames.some(excluded => nameLower.includes(excluded))

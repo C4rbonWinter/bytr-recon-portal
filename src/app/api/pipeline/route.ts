@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     )
     
     // Transform to pipeline cards - filter out test records
-    const excludeNames = ['test', 'josh summers', 'joshua summers']
+    const excludeNames = ['test', 'josh summers', 'joshua summers', 'blake sales']
     const cards: PipelineCard[] = (opportunities || [])
       .filter(opp => {
         const nameLower = (opp.name || '').toLowerCase()
