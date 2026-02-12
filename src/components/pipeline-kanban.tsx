@@ -505,15 +505,57 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
 
   if (!data) return null
 
-  // Get all cards for calculating available months
+  // Get all cards
   const allCards = Object.values(data.pipeline).flat()
   
-  // Calculate available months from card creation dates
-  const availableMonths = Array.from(
-    new Set(allCards.map(card => card.createdAt?.slice(0, 7)).filter(Boolean))
-  ).sort().reverse() // Most recent first
+  // Time period filter options
+  const TIME_PERIODS = [
+    { value: 'all', label: 'All Time' },
+    { value: 'this_month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
+    { value: 'last_30', label: 'Last 30 Days' },
+    { value: 'last_90', label: 'Last 90 Days' },
+    { value: 'this_year', label: 'This Year' },
+    { value: 'last_year', label: 'Last Year' },
+  ]
   
-  // Filter pipeline data by search query and month
+  // Get date range for filter
+  const getDateRange = (period: string): { start: Date | null; end: Date | null } => {
+    const now = new Date()
+    const thisYear = now.getFullYear()
+    const thisMonth = now.getMonth()
+    
+    switch (period) {
+      case 'this_month':
+        return { start: new Date(thisYear, thisMonth, 1), end: null }
+      case 'last_month':
+        return { 
+          start: new Date(thisYear, thisMonth - 1, 1), 
+          end: new Date(thisYear, thisMonth, 0, 23, 59, 59) 
+        }
+      case 'last_30':
+        const d30 = new Date(now)
+        d30.setDate(d30.getDate() - 30)
+        return { start: d30, end: null }
+      case 'last_90':
+        const d90 = new Date(now)
+        d90.setDate(d90.getDate() - 90)
+        return { start: d90, end: null }
+      case 'this_year':
+        return { start: new Date(thisYear, 0, 1), end: null }
+      case 'last_year':
+        return { 
+          start: new Date(thisYear - 1, 0, 1), 
+          end: new Date(thisYear - 1, 11, 31, 23, 59, 59) 
+        }
+      default:
+        return { start: null, end: null }
+    }
+  }
+  
+  const dateRange = getDateRange(monthFilter)
+  
+  // Filter pipeline data by search query and time period
   const filteredPipeline = Object.fromEntries(
     Object.entries(data.pipeline).map(([stage, cards]) => [
       stage,
@@ -522,9 +564,12 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         if (searchQuery && !card.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           return false
         }
-        // Month filter
-        if (monthFilter !== 'all' && card.createdAt?.slice(0, 7) !== monthFilter) {
-          return false
+        // Time period filter
+        if (dateRange.start || dateRange.end) {
+          const cardDate = card.createdAt ? new Date(card.createdAt) : null
+          if (!cardDate) return false
+          if (dateRange.start && cardDate < dateRange.start) return false
+          if (dateRange.end && cardDate > dateRange.end) return false
         }
         return true
       })
@@ -605,12 +650,9 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             onChange={(e) => setMonthFilter(e.target.value)}
             className="border border-border rounded-lg pl-3 pr-8 py-2 text-sm bg-secondary text-foreground"
           >
-            <option value="all">All Months</option>
-            {availableMonths.map(month => {
-              const [year, m] = month.split('-')
-              const displayName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
-              return <option key={month} value={month}>{displayName}</option>
-            })}
+            {TIME_PERIODS.map(period => (
+              <option key={period.value} value={period.value}>{period.label}</option>
+            ))}
           </select>
           <select
             value={clinicFilter}
