@@ -186,51 +186,46 @@ export function shouldBeCold(lastActivityDate: Date | string | null): boolean {
   return daysSinceActivity > COLD_THRESHOLD_DAYS
 }
 
-// Stages that are clinically "won" but need invoice to be financially won
-const WON_STAGES_REQUIRING_INVOICE = new Set([
+// Won stage names - these ALWAYS map to won (tags don't override)
+const WON_STAGE_NAMES = new Set([
   'smile design',
   'pre surgery',
   'surgery',
   'surgery completed',
   'after care',
   'testimonial',
+  'financials completed',
+  'won',
+  'closed',
+  'sold',
 ])
 
-// Tags that indicate a signed agreement
-const AGREEMENT_TAGS = new Set([
-  'pt-agreement-signed',
-])
-
-// Determine super stage: Tags take precedence, then stage, then cold check
-// Won requires: (agreement tag OR won stage) AND invoice > 0
+// Determine super stage: Won stages first, then tags, then other stages, then cold
 export function determineSuperStage(
   stageName: string | null,
   tags: string[],
   lastActivityDate: Date | string | null,
   monetaryValue: number = 0
 ): SuperStage | null {
-  // 1. Check tags first (most specific signal)
+  // 1. Check if in a Won stage FIRST - these are authoritative, tags don't override
+  if (stageName) {
+    const normalizedStage = stageName.toLowerCase().trim()
+    if (WON_STAGE_NAMES.has(normalizedStage)) {
+      // Won stages with $0 invoice go to Financing (awaiting payment)
+      // Won stages with invoice > 0 are truly Won
+      return monetaryValue > 0 ? 'won' : 'financing'
+    }
+  }
+  
+  // 2. Check tags (for non-won stages, tags are most specific signal)
   const tagStage = getSuperStageByTags(tags)
   if (tagStage) return tagStage
   
-  // 2. Check stage name
+  // 3. Check stage name for other stages
   if (stageName) {
-    const normalizedStage = stageName.toLowerCase().trim()
     const stageResult = getSuperStageByName(stageName)
     
     if (stageResult) {
-      // Special handling for "won" stages - require invoice to be truly won
-      if (stageResult === 'won') {
-        const hasInvoice = monetaryValue > 0
-        const hasAgreementTag = tags.some(t => AGREEMENT_TAGS.has(t.toLowerCase()))
-        
-        // Only mark as won if they have an invoice
-        // Otherwise keep in closing (financially not closed yet)
-        if (!hasInvoice) {
-          return 'closing'
-        }
-      }
-      
       // If deal is in an active stage but hasn't had activity in 20+ days, mark cold
       if (stageResult !== 'won' && stageResult !== 'cold' && shouldBeCold(lastActivityDate)) {
         return 'cold'
@@ -239,7 +234,7 @@ export function determineSuperStage(
     }
   }
   
-  // 3. No stage match and no recent activity = cold
+  // 4. No stage match and no recent activity = cold
   if (shouldBeCold(lastActivityDate)) {
     return 'cold'
   }
