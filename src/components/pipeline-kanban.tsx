@@ -577,7 +577,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   ) as Record<SuperStage, PipelineCard[]>
 
   // Recalculate totals based on filtered data
-  const filteredTotals = (searchQuery || monthFilter !== 'all')
+  const filteredTotals = (searchQuery || monthFilter !== 'this_month' || monthFilter !== 'all')
     ? {
         count: Object.values(filteredPipeline).flat().length,
         value: Object.values(filteredPipeline).flat().reduce((sum, card) => sum + card.value, 0),
@@ -589,6 +589,51 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         ) as Record<SuperStage, { count: number; value: number }>
       }
     : data.totals
+
+  // Calculate leaderboard from filtered data
+  const filteredLeaderboard = (() => {
+    const allFilteredCards = Object.values(filteredPipeline).flat()
+    
+    // Deals Won - count of cards in "won" stage by salesperson
+    const wonBySalesperson: Record<string, number> = {}
+    const pipelineBySalesperson: Record<string, number> = {}
+    
+    for (const card of allFilteredCards) {
+      const sp = card.assignedTo || 'Unassigned'
+      if (sp === 'Unassigned') continue
+      
+      if (card.stage === 'won') {
+        wonBySalesperson[sp] = (wonBySalesperson[sp] || 0) + 1
+      } else if (card.stage !== 'cold') {
+        // Active pipeline (not won, not cold)
+        pipelineBySalesperson[sp] = (pipelineBySalesperson[sp] || 0) + 1
+      }
+    }
+    
+    // Find top deals won
+    let topWon = { name: '—', value: 0, displayValue: '0' }
+    for (const [name, count] of Object.entries(wonBySalesperson)) {
+      if (count > topWon.value) {
+        topWon = { name, value: count, displayValue: count.toString() }
+      }
+    }
+    
+    // Find biggest pipeline
+    let topPipeline = { name: '—', value: 0, displayValue: '0' }
+    for (const [name, count] of Object.entries(pipelineBySalesperson)) {
+      if (count > topPipeline.value) {
+        topPipeline = { name, value: count, displayValue: count.toString() }
+      }
+    }
+    
+    return {
+      dealsWon: topWon,
+      biggestPipeline: topPipeline,
+      // Keep collections and fastest closer from backend (they need payment data)
+      totalCollections: leaderboard?.totalCollections || { name: '—', value: 0, displayValue: '$0' },
+      fastestCloser: leaderboard?.fastestCloser || { name: '—', value: 0, displayValue: '—' },
+    }
+  })()
 
   return (
     <DndContext
@@ -606,32 +651,32 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
         )}
 
         {/* Stats Cards */}
-        {leaderboard && data && (
+        {data && (
           <div className="grid grid-cols-5 gap-4 mb-4">
             <div className="bg-card p-4 rounded-lg border border-border hover:border-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Pipeline</div>
-              <div className="text-2xl font-bold text-foreground tracking-tight">{formatCurrency(data.totals.value)}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{data.totals.count} opportunities</div>
+              <div className="text-2xl font-bold text-foreground tracking-tight">{formatCurrency(filteredTotals.value)}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredTotals.count} opportunities</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-chart-5/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Deals Won</div>
-              <div className="text-2xl font-bold text-chart-5 tracking-tight">{leaderboard.dealsWon.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.dealsWon.name}</div>
+              <div className="text-2xl font-bold text-chart-5 tracking-tight">{filteredLeaderboard.dealsWon.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.dealsWon.name}</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Total Collections</div>
-              <div className="text-2xl font-bold text-success tracking-tight">{leaderboard.totalCollections.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.totalCollections.name}</div>
+              <div className="text-2xl font-bold text-success tracking-tight">{filteredLeaderboard.totalCollections.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.totalCollections.name}</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Biggest Pipeline</div>
-              <div className="text-2xl font-bold text-chart-1 tracking-tight">{leaderboard.biggestPipeline.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.biggestPipeline.name}</div>
+              <div className="text-2xl font-bold text-chart-1 tracking-tight">{filteredLeaderboard.biggestPipeline.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.biggestPipeline.name}</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-primary/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Fastest Closer</div>
-              <div className="text-2xl font-bold text-primary tracking-tight">{leaderboard.fastestCloser.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{leaderboard.fastestCloser.name}</div>
+              <div className="text-2xl font-bold text-primary tracking-tight">{filteredLeaderboard.fastestCloser.displayValue}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.fastestCloser.name}</div>
             </div>
           </div>
         )}
