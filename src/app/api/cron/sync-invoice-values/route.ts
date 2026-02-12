@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT, importPKCS8 } from 'jose'
-import { updateOpportunityValue as ghlOAuthUpdate } from '@/lib/ghl-oauth'
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET
@@ -286,14 +285,33 @@ async function updateOpportunityValue(
   opportunityId: string,
   value: number
 ): Promise<boolean> {
-  const config = CLINIC_CONFIG[clinic]
+  const token = GHL_TOKENS[clinic]
+  if (!token) {
+    console.error(`No token for clinic ${clinic}`)
+    return false
+  }
   
   try {
-    const result = await ghlOAuthUpdate(config.locationId, opportunityId, value)
-    if (!result.success) {
-      console.error(`Failed to update opportunity ${opportunityId}:`, result.error)
+    const response = await fetch(
+      `https://services.leadconnectorhq.com/opportunities/${opportunityId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Version': '2021-07-28',
+        },
+        body: JSON.stringify({ monetaryValue: value }),
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.text()
+      console.error(`Failed to update opportunity ${opportunityId}:`, error)
+      return false
     }
-    return result.success
+    
+    return true
   } catch (error) {
     console.error(`Failed to update opportunity ${opportunityId}:`, error)
     return false
