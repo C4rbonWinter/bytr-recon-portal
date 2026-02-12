@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLocationToken } from '@/lib/ghl-oauth'
 import { getSupabase } from '@/lib/supabase'
 import { CLINIC_CONFIG, getSuperStageByName, getSalespersonName } from '@/lib/pipeline-config'
+
+// Use static Private Integration tokens (don't rotate like OAuth)
+function getStaticToken(clinic: string): string {
+  switch (clinic) {
+    case 'TR01': return process.env.GHL_TOKEN_SG || ''
+    case 'TR02': return process.env.GHL_TOKEN_IRV || ''
+    case 'TR04': return process.env.GHL_TOKEN_VEGAS || ''
+    default: return ''
+  }
+}
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Allow up to 60 seconds for full sync
@@ -39,13 +48,12 @@ async function fetchClinicOpportunities(
   clinic: string,
   config: typeof CLINIC_CONFIG[keyof typeof CLINIC_CONFIG]
 ): Promise<{ opportunities: GHLOpportunity[]; stageNames: Record<string, string> }> {
-  const tokenResult = await getLocationToken('', config.locationId)
-  if (!tokenResult.success || !tokenResult.accessToken) {
-    console.error(`Failed to get token for ${clinic}:`, tokenResult.error)
+  // Use static Private Integration token (stable, doesn't rotate)
+  const accessToken = getStaticToken(clinic)
+  if (!accessToken) {
+    console.error(`No static token configured for ${clinic}`)
     return { opportunities: [], stageNames: {} }
   }
-  
-  const accessToken = tokenResult.accessToken
   
   // Fetch pipeline stages
   const pipelinesRes = await fetch(
