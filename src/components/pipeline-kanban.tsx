@@ -325,10 +325,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       
       const result = await response.json()
       setData(result)
-      // Leaderboard now comes from pipeline response
-      if (result.leaderboard) {
-        setLeaderboard(result.leaderboard)
-      }
+      // Note: Leaderboard is fetched separately with period filter (see monthFilter useEffect)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
