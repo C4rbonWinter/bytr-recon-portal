@@ -9,6 +9,19 @@ import {
 } from 'lucide-react'
 import { Header } from '@/components/header'
 
+// Simulated users for "View As" feature (matches Pipeline page)
+const USERS = [
+  { id: 'admin', name: 'Cole', role: 'admin' as const },
+  { id: 'josh', name: 'Josh', role: 'admin' as const },
+  { id: 'chris', name: 'Chris', role: 'admin' as const },
+  { id: 'molly', name: 'Molly', role: 'salesperson' as const },
+  { id: 'scot', name: 'Scot', role: 'salesperson' as const },
+  { id: 'jake', name: 'Jake', role: 'salesperson' as const },
+  { id: 'blake', name: 'Blake', role: 'salesperson' as const },
+]
+
+const VIEW_AS_OPTIONS = USERS.map(u => ({ id: u.id, name: u.name }))
+
 // GHL User ID → Name mapping for display fallback
 const GHL_USER_MAPPING: Record<string, string> = {
   'xGHzefX0G70ObVhtULtS': 'Josh',
@@ -221,14 +234,19 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
+  const [viewAsUser, setViewAsUser] = useState(USERS[0])
 
-  // Get user from session (default to Cole's admin view for dev/testing)
+  // Get user from viewAs selection
   const currentUser: User = {
-    name: session?.user?.name || 'Cole',
-    role: (session?.user as any)?.role || 'admin',
+    name: viewAsUser.name,
+    role: viewAsUser.role,
   }
 
   const isSalesperson = currentUser.role === 'salesperson'
+  
+  const handleViewAsChange = (id: string) => {
+    setViewAsUser(USERS.find(u => u.id === id) || USERS[0])
+  }
 
   // Fetch deals from API
   const fetchDeals = async () => {
@@ -443,9 +461,18 @@ export default function Dashboard() {
         onNewDeal={() => setShowNewDeal(true)} 
         unverifiedPayments={unverifiedPayments}
         onPaymentClick={handlePaymentNotificationClick}
+        viewAsOptions={VIEW_AS_OPTIONS}
+        currentViewAs={viewAsUser.id}
+        onViewAsChange={handleViewAsChange}
       />
 
       <main className="max-w-[1800px] mx-auto px-6 py-6">
+        {isSalesperson && (
+          <div className="mb-4 px-4 py-2 bg-chart-5/10 rounded-lg text-sm text-chart-5">
+            Viewing as <strong>{currentUser.name}</strong> — showing only their assigned deals
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-card p-5 rounded-lg border border-border hover:border-primary/20 transition-colors">
