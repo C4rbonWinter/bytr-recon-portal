@@ -165,16 +165,21 @@ export async function POST(request: NextRequest) {
       const { opportunities, stageNames } = await fetchClinicOpportunities(clinic, config)
       results[clinic].fetched = opportunities.length
       
-      // Fetch existing deal_type values so we don't overwrite them
+      // Fetch existing deal_type values so we don't overwrite them (batch to avoid URL length limits)
       const oppIds = opportunities.map(opp => opp.id)
-      const { data: existingRecords } = await supabase
-        .from('opportunities')
-        .select('id, deal_type')
-        .in('id', oppIds)
-      
-      const existingDealTypes = new Map<string, string | null>(
-        (existingRecords || []).map(r => [r.id, r.deal_type])
-      )
+      const existingDealTypes = new Map<string, string | null>()
+      const LOOKUP_BATCH_SIZE = 100
+      for (let i = 0; i < oppIds.length; i += LOOKUP_BATCH_SIZE) {
+        const batchIds = oppIds.slice(i, i + LOOKUP_BATCH_SIZE)
+        const { data: existingRecords } = await supabase
+          .from('opportunities')
+          .select('id, deal_type')
+          .in('id', batchIds)
+        
+        for (const r of existingRecords || []) {
+          existingDealTypes.set(r.id, r.deal_type)
+        }
+      }
       
       // Transform and upsert to Supabase
       const rows = opportunities
@@ -218,16 +223,19 @@ export async function POST(request: NextRequest) {
         })
         .filter(Boolean)
       
-      if (rows.length > 0) {
+      // Batch upserts in groups of 100 to avoid Supabase limits
+      const BATCH_SIZE = 100
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE)
         const { error } = await supabase
           .from('opportunities')
-          .upsert(rows, { onConflict: 'id' })
+          .upsert(batch, { onConflict: 'id' })
         
         if (error) {
-          console.error(`Upsert error for ${clinic}:`, error)
+          console.error(`Upsert error for ${clinic} (batch ${i}):`, error)
           results[clinic].errors++
         } else {
-          results[clinic].upserted = rows.length
+          results[clinic].upserted += batch.length
         }
       }
     }
