@@ -75,7 +75,57 @@ function normalizeSalesperson(value: string | null): string {
   return value
 }
 
+// Get date range for a time period filter
+function getDateRange(period: string): { start: Date | null; end: Date | null } {
+  const now = new Date()
+  const thisYear = now.getFullYear()
+  const thisMonth = now.getMonth()
+  
+  switch (period) {
+    case 'this_month':
+      return { start: new Date(thisYear, thisMonth, 1), end: null }
+    case 'last_month':
+      return { 
+        start: new Date(thisYear, thisMonth - 1, 1), 
+        end: new Date(thisYear, thisMonth, 0, 23, 59, 59, 999) 
+      }
+    case 'last_30':
+      const d30 = new Date(now)
+      d30.setDate(d30.getDate() - 30)
+      d30.setHours(0, 0, 0, 0)
+      return { start: d30, end: null }
+    case 'last_90':
+      const d90 = new Date(now)
+      d90.setDate(d90.getDate() - 90)
+      d90.setHours(0, 0, 0, 0)
+      return { start: d90, end: null }
+    case 'this_year':
+      return { start: new Date(thisYear, 0, 1), end: null }
+    case 'last_year':
+      return { 
+        start: new Date(thisYear - 1, 0, 1), 
+        end: new Date(thisYear - 1, 11, 31, 23, 59, 59, 999) 
+      }
+    default: // 'all'
+      return { start: null, end: null }
+  }
+}
+
+// Check if a date falls within a range
+function isInDateRange(date: Date | string | null, range: { start: Date | null; end: Date | null }): boolean {
+  if (!range.start && !range.end) return true // No filter
+  if (!date) return false
+  
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (range.start && d < range.start) return false
+  if (range.end && d > range.end) return false
+  return true
+}
+
 export async function GET(request: NextRequest) {
+  // Get period filter from query params
+  const period = request.nextUrl.searchParams.get('period') || 'all'
+  const dateRange = getDateRange(period)
   try {
     // Validate env vars
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -117,19 +167,24 @@ export async function GET(request: NextRequest) {
       dealStartDate[deal.id] = parseDealMonth(deal.deal_month)
     }
 
-    // Calculate collections by salesperson from payments
+    // Calculate collections by salesperson from payments (filtered by date range)
     const collectionsBySalesperson: Record<string, number> = {}
     for (const payment of payments || []) {
+      // Filter by payment_date within the selected period
+      if (!isInDateRange(payment.payment_date, dateRange)) continue
+      
       const sp = normalizeSalesperson(dealSalesperson[payment.deal_id])
       if (sp === 'Unassigned') continue
       if (!collectionsBySalesperson[sp]) collectionsBySalesperson[sp] = 0
       collectionsBySalesperson[sp] += payment.amount || 0
     }
 
-    // Find first payment date per deal
+    // Find first payment date per deal (only considering payments in date range)
     const firstPaymentByDeal: Record<string, string> = {}
     for (const payment of payments || []) {
       if (!payment.payment_date) continue
+      // Only consider payments within the selected period for fastest closer
+      if (!isInDateRange(payment.payment_date, dateRange)) continue
       if (!firstPaymentByDeal[payment.deal_id] || payment.payment_date < firstPaymentByDeal[payment.deal_id]) {
         firstPaymentByDeal[payment.deal_id] = payment.payment_date
       }

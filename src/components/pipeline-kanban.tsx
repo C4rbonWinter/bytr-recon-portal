@@ -346,6 +346,22 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   useEffect(() => {
     fetchPipeline()
   }, [clinicFilter, salespersonFilter])
+  
+  // Fetch leaderboard with period filter for collections/fastest closer
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const response = await fetch(`/api/pipeline/leaderboard?period=${monthFilter}`)
+        if (response.ok) {
+          const result = await response.json()
+          setLeaderboard(result)
+        }
+      } catch (err) {
+        console.error('Leaderboard fetch error:', err)
+      }
+    }
+    fetchLeaderboard()
+  }, [monthFilter])
 
   const handleDragStart = (event: DragStartEvent) => {
     const cardId = event.active.id as string
