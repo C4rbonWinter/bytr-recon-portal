@@ -576,19 +576,17 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
     ])
   ) as Record<SuperStage, PipelineCard[]>
 
-  // Recalculate totals based on filtered data
-  const filteredTotals = (searchQuery || monthFilter !== 'this_month' || monthFilter !== 'all')
-    ? {
-        count: Object.values(filteredPipeline).flat().length,
-        value: Object.values(filteredPipeline).flat().reduce((sum, card) => sum + card.value, 0),
-        byStage: Object.fromEntries(
-          Object.entries(filteredPipeline).map(([stage, cards]) => [
-            stage,
-            { count: cards.length, value: cards.reduce((sum, card) => sum + card.value, 0) }
-          ])
-        ) as Record<SuperStage, { count: number; value: number }>
-      }
-    : data.totals
+  // Always calculate totals from filtered data
+  const filteredTotals = {
+    count: Object.values(filteredPipeline).flat().length,
+    value: Object.values(filteredPipeline).flat().reduce((sum, card) => sum + card.value, 0),
+    byStage: Object.fromEntries(
+      Object.entries(filteredPipeline).map(([stage, cards]) => [
+        stage,
+        { count: cards.length, value: cards.reduce((sum, card) => sum + card.value, 0) }
+      ])
+    ) as Record<SuperStage, { count: number; value: number }>
+  }
 
   // Calculate leaderboard from filtered data
   const filteredLeaderboard = (() => {
