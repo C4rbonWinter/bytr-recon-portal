@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { STAGE_CONFIG, SUPER_STAGES, SuperStage, getSalespersonName, SALESPERSON_IDS } from '@/lib/pipeline-config'
 // SyncIndicator moved to header
 import {
@@ -776,7 +776,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
                   onClick={() => setSelectedCard(null)}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  ✕
+                  <X className="h-5 w-5" />
                 </button>
               </div>
               

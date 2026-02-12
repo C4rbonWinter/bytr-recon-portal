@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { CheckCircle2, AlertTriangle, XCircle, Flag, FileSpreadsheet } from 'lucide-react'
+import { 
+  CheckCircle2, AlertTriangle, XCircle, Flag, FileSpreadsheet,
+  Banknote, CreditCard, Cherry, Heart, FileText, Landmark, Receipt,
+  Asterisk, Sun, Building2, Shield, Zap, Users2, FileCheck, Check, X
+} from 'lucide-react'
 import { Header } from '@/components/header'
 
 // GHL User ID → Name mapping for display fallback
@@ -98,6 +102,58 @@ const clinicNames: Record<string, string> = {
   TR04: 'LV',
 }
 
+// Time period filter options (same as pipeline)
+const TIME_PERIODS = [
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_30', label: 'Last 30 Days' },
+  { value: 'last_90', label: 'Last 90 Days' },
+  { value: 'this_year', label: 'This Year' },
+  { value: 'last_year', label: 'Last Year' },
+  { value: 'all', label: 'All Time' },
+]
+
+// Get date range for filter
+const getDateRange = (period: string): { start: Date | null; end: Date | null } => {
+  const now = new Date()
+  const thisYear = now.getFullYear()
+  const thisMonth = now.getMonth()
+  
+  switch (period) {
+    case 'this_month':
+      return {
+        start: new Date(thisYear, thisMonth, 1),
+        end: new Date(thisYear, thisMonth + 1, 0, 23, 59, 59),
+      }
+    case 'last_month':
+      return {
+        start: new Date(thisYear, thisMonth - 1, 1),
+        end: new Date(thisYear, thisMonth, 0, 23, 59, 59),
+      }
+    case 'last_30':
+      const thirtyDaysAgo = new Date(now)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      return { start: thirtyDaysAgo, end: now }
+    case 'last_90':
+      const ninetyDaysAgo = new Date(now)
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+      return { start: ninetyDaysAgo, end: now }
+    case 'this_year':
+      return {
+        start: new Date(thisYear, 0, 1),
+        end: new Date(thisYear, 11, 31, 23, 59, 59),
+      }
+    case 'last_year':
+      return {
+        start: new Date(thisYear - 1, 0, 1),
+        end: new Date(thisYear - 1, 11, 31, 23, 59, 59),
+      }
+    case 'all':
+    default:
+      return { start: null, end: null }
+  }
+}
+
 const clinicColors: Record<string, string> = {
   TR01: 'bg-chart-5/10 text-chart-5',
   TR02: 'bg-chart-4/10 text-chart-4',
@@ -135,20 +191,24 @@ const StatusIcon = ({ status }: { status: string }) => {
   }
 }
 
-const methodIcons: Record<string, string> = {
-  'Cash': '💵',
-  'Credit Card': '💳',
-  'Cherry': '🍒',
-  'CareCredit': '💙',
-  'Proceed': '📄',
-  'Patient Preferred': '🏦',
-  'Check': '📝',
-  'Alphaeon': '🅰️',
-  'Sunbit': '☀️',
-  'HFD': '🏥',
-  'LendingClub': '🏛️',
-  'Insurance': '🛡️',
-  'ACH/Wire': '🔌',
+const MethodIcon = ({ method }: { method: string }) => {
+  const iconClass = "h-4 w-4 inline-block"
+  switch (method) {
+    case 'Cash': return <Banknote className={`${iconClass} text-success`} />
+    case 'Credit Card': return <CreditCard className={`${iconClass} text-chart-5`} />
+    case 'Cherry': return <Cherry className={`${iconClass} text-red-400`} />
+    case 'CareCredit': return <Heart className={`${iconClass} text-blue-400`} />
+    case 'Proceed': return <FileText className={`${iconClass} text-chart-4`} />
+    case 'Patient Preferred': return <Landmark className={`${iconClass} text-amber-400`} />
+    case 'Check': return <Receipt className={`${iconClass} text-muted-foreground`} />
+    case 'Alphaeon': return <Asterisk className={`${iconClass} text-purple-400`} />
+    case 'Sunbit': return <Sun className={`${iconClass} text-yellow-400`} />
+    case 'HFD': return <Building2 className={`${iconClass} text-teal-400`} />
+    case 'LendingClub': return <Landmark className={`${iconClass} text-indigo-400`} />
+    case 'Insurance': return <Shield className={`${iconClass} text-chart-3`} />
+    case 'ACH/Wire': return <Zap className={`${iconClass} text-chart-1`} />
+    default: return null
+  }
 }
 
 export default function Dashboard() {
@@ -157,7 +217,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [monthFilter, setMonthFilter] = useState<string>('all')
+  const [monthFilter, setMonthFilter] = useState<string>('this_month')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
@@ -283,7 +343,7 @@ export default function Dashboard() {
     }
   }
 
-  const handleUpdateDeal = async (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => {
+  const handleUpdateDeal = async (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string }) => {
     try {
       const response = await fetch('/api/deals', {
         method: 'PATCH',
@@ -299,6 +359,7 @@ export default function Dashboard() {
             ...prev, 
             ...(updates.sharedWith !== undefined && { sharedWith: updates.sharedWith }),
             ...(updates.salesperson !== undefined && { salesperson: updates.salesperson || null }),
+            ...(updates.notes !== undefined && { notes: updates.notes }),
           }
         })
       } else {
@@ -343,30 +404,23 @@ export default function Dashboard() {
     }
   }
 
-  // Get unique months from deals for filter dropdown
-  // Normalize months to YYYY-MM format, dedupe, and sort newest first
-  const normalizeMonth = (month: string): string => {
-    if (!month) return ''
-    // Already in YYYY-MM format
-    if (/^\d{4}-\d{2}$/.test(month)) return month
-    // Try parsing "Month Year" or "Mon Year" format
-    const parsed = new Date(month + ' 1')
-    if (!isNaN(parsed.getTime())) {
-      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`
-    }
-    return month
-  }
-  
-  const availableMonths = Array.from(
-    new Set(deals.map(d => normalizeMonth(d.dealMonth)).filter(Boolean))
-  ).sort().reverse()
-
-  // Filtered deals
+  // Filtered deals using time period filter
   const filteredDeals = deals.filter(d => {
     if (clinicFilter !== 'all' && d.clinic !== clinicFilter) return false
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
-    if (monthFilter !== 'all' && normalizeMonth(d.dealMonth) !== monthFilter) return false
     if (searchQuery && !d.patientName.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    
+    // Time period filter
+    if (monthFilter !== 'all' && d.dealMonth) {
+      const { start, end } = getDateRange(monthFilter)
+      if (start && end) {
+        // Parse deal month (YYYY-MM format) to a date
+        const [year, month] = d.dealMonth.split('-').map(Number)
+        const dealDate = new Date(year, month - 1, 15) // Use middle of month
+        if (dealDate < start || dealDate > end) return false
+      }
+    }
+    
     return true
   })
 
@@ -377,7 +431,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#212429] flex items-center justify-center">
         <div className="text-gray-500 dark:text-zinc-400">Loading deals...</div>
       </div>
     )
@@ -426,16 +480,9 @@ export default function Dashboard() {
             onChange={(e) => setMonthFilter(e.target.value)}
             className="border border-border rounded-lg pl-3 pr-8 py-2 bg-secondary text-foreground text-sm"
           >
-            <option value="all">All Months</option>
-            {availableMonths.map(month => {
-              // Handle both "2026-01" and "Jan 2026" formats
-              let displayName = month
-              if (month.includes('-')) {
-                const [year, m] = month.split('-')
-                displayName = new Date(Number(year), Number(m) - 1).toLocaleString('default', { month: 'long', year: 'numeric' })
-              }
-              return <option key={month} value={month}>{displayName}</option>
-            })}
+            {TIME_PERIODS.map(period => (
+              <option key={period.value} value={period.value}>{period.label}</option>
+            ))}
           </select>
           <select
             value={clinicFilter}
@@ -481,9 +528,9 @@ export default function Dashboard() {
                     {deal.patientName}
                     {deal.sharedWith && (
                       <span 
-                        className="ml-2 cursor-help text-chart-5" 
+                        className="ml-2 cursor-help text-chart-5 inline-flex items-center" 
                         title={`Shared with ${deal.sharedWith === currentUser.name ? deal.salesperson : deal.sharedWith}`}
-                      >⊕</span>
+                      ><Users2 className="h-4 w-4" /></span>
                     )}
                   </td>
                   <td className="px-4 py-3"><ClinicBadge clinic={deal.clinic} /></td>
@@ -640,7 +687,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4 border border-border">
         <div className="flex justify-between items-center p-4 border-b dark:border-zinc-700">
           <h2 className="text-lg font-semibold dark:text-zinc-100">New Deal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
@@ -651,7 +698,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
                 setFormData({ ...formData, clinic: e.target.value, patientName: '' })
                 setSearchResults([])
               }}
-              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-zinc-700 dark:text-zinc-100"
+              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-[#212429] dark:text-zinc-100"
               required
             >
               <option value="">Select clinic first...</option>
@@ -667,7 +714,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
               value={formData.patientName}
               onChange={(e) => handleNameChange(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowResults(true)}
-              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-zinc-700 dark:text-zinc-100"
+              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 dark:bg-[#212429] dark:text-zinc-100"
               placeholder={formData.clinic ? "Start typing..." : "Select clinic first"}
               disabled={!formData.clinic}
               required
@@ -676,7 +723,7 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
               <span className="absolute right-3 top-9 text-gray-400 dark:text-zinc-500 text-sm">Searching...</span>
             )}
             {showResults && searchResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-700 border dark:border-zinc-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#212429] border dark:border-zinc-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {searchResults.map((result) => (
                   <button
                     key={result.id}
@@ -686,14 +733,14 @@ function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void;
                   >
                     <div className="font-medium">{result.name}</div>
                     <div className="text-xs text-gray-500 dark:text-zinc-400">
-                      {result.invoiceLink && '📋 Has invoice'}
+                      {result.invoiceLink && <span className="inline-flex items-center gap-1"><FileCheck className="h-3 w-3" /> Has invoice</span>}
                     </div>
                   </button>
                 ))}
               </div>
             )}
             {showResults && searchResults.length === 0 && formData.patientName.length >= 2 && !isSearching && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-700 border dark:border-zinc-600 rounded-lg shadow-lg p-3 text-sm text-gray-500 dark:text-zinc-400">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#212429] border dark:border-zinc-600 rounded-lg shadow-lg p-3 text-sm text-gray-500 dark:text-zinc-400">
                 No patients found in GHL. You can still create a new deal.
               </div>
             )}
@@ -793,12 +840,13 @@ function DealDetailModal({
   onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
   onDeletePayment: (paymentId: string) => void
   onVerifyPayment: (paymentId: string) => void
-  onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string }) => Promise<void>
+  onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string }) => Promise<void>
   isSalesperson: boolean
 }) {
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [sharedWith, setSharedWith] = useState(deal.sharedWith || '')
   const [salesperson, setSalesperson] = useState(deal.salesperson)
+  const [notes, setNotes] = useState(deal.notes || '')
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     method: '' as Payment['method'] | '',
@@ -806,7 +854,7 @@ function DealDetailModal({
   })
 
   // Track if there are unsaved changes
-  const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '')
+  const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '') || notes !== (deal.notes || '')
 
   // Close on Escape key
   useEffect(() => {
@@ -820,12 +868,15 @@ function DealDetailModal({
   // Smart save on close - check for changes and save them
   const handleClose = async () => {
     if (hasChanges) {
-      const changes: { sharedWith?: string | null; salesperson?: string } = {}
+      const changes: { sharedWith?: string | null; salesperson?: string; notes?: string } = {}
       if (sharedWith !== (deal.sharedWith || '')) {
         changes.sharedWith = sharedWith || null
       }
       if ((salesperson || '') !== (deal.salesperson || '')) {
         changes.salesperson = salesperson || ''
+      }
+      if (notes !== (deal.notes || '')) {
+        changes.notes = notes
       }
       await onUpdateDeal(deal.id, changes)
     }
@@ -863,13 +914,13 @@ function DealDetailModal({
               {!isSalesperson && <span>{getSalespersonDisplay(deal.salesperson)}</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="p-4 overflow-y-auto flex-1">
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
+            <div className="text-center p-3 bg-gray-50 dark:bg-[#212429] rounded-lg">
               <div className="text-lg font-bold dark:text-zinc-100">
                 {formatCurrency(deal.planTotal)}
                 {deal.invoiceLink && (
@@ -898,22 +949,15 @@ function DealDetailModal({
             </div>
           </div>
 
-          {/* Notes */}
-          {deal.notes && (
-            <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-sm text-gray-700 dark:text-zinc-300">{deal.notes}</p>
-            </div>
-          )}
-
           {/* Salesperson (admin only) */}
           {!isSalesperson && (
-            <div className="mb-4 p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-[#212429] rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Salesperson:</span>
                 <select
                   value={salesperson}
                   onChange={(e) => setSalesperson(e.target.value)}
-                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-zinc-600 dark:text-zinc-100"
+                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-[#212429] dark:text-zinc-100"
                 >
                   <option value="">Unassigned</option>
                   <option value="Chris">Chris</option>
@@ -929,13 +973,13 @@ function DealDetailModal({
           )}
 
           {/* Shared With */}
-          <div className="mb-4 p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
+          <div className="mb-4 p-3 bg-gray-50 dark:bg-[#212429] rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Shared With:</span>
                 <select
                   value={sharedWith}
                   onChange={(e) => setSharedWith(e.target.value)}
-                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-zinc-600 dark:text-zinc-100"
+                  className="border dark:border-zinc-600 rounded px-2 py-1 text-sm dark:bg-[#212429] dark:text-zinc-100"
                 >
                   <option value="">None</option>
                   <option value="Chris">Chris</option>
@@ -947,6 +991,18 @@ function DealDetailModal({
                 </select>
               </div>
             </div>
+
+          {/* Notes */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full border dark:border-zinc-600 rounded-lg px-3 py-2 text-sm dark:bg-[#212429] dark:text-zinc-100"
+              rows={2}
+              placeholder="Add notes..."
+            />
+          </div>
 
           {/* Payments */}
           <div className="mb-4">
@@ -965,17 +1021,20 @@ function DealDetailModal({
             ) : (
               <div className="space-y-2">
                 {deal.payments.map((payment) => (
-                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
-                    <div>
+                  <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-[#212429] rounded-lg">
+                    <div className="flex items-center">
                       <span className="font-medium dark:text-zinc-100">{formatCurrency(payment.amount)}</span>
-                      <span className="text-gray-500 dark:text-zinc-400 text-sm ml-2">{payment.method}</span>
+                      <span className="text-gray-500 dark:text-zinc-400 text-sm ml-2 flex items-center gap-1">
+                        <MethodIcon method={payment.method} />
+                        {payment.method}
+                      </span>
                       {payment.method === 'Cash' && !payment.verified && (
                         <span className="ml-2 text-xs bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded">Pending Verification</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
                       {payment.date}
-                      {payment.verified && <span>✅</span>}
+                      {payment.verified && <Check className="h-4 w-4 text-success" />}
                       {!isSalesperson && payment.method === 'Cash' && !payment.verified && (
                         <button
                           onClick={() => onVerifyPayment(payment.id)}
@@ -985,13 +1044,13 @@ function DealDetailModal({
                           Verify
                         </button>
                       )}
-                      {!isSalesperson && (
+                      {!isSalesperson && !payment.verified && (
                         <button
                           onClick={() => onDeletePayment(payment.id)}
                           className="text-red-400 hover:text-red-600 ml-2"
                           title="Delete payment"
                         >
-                          ✕
+                          <X className="h-4 w-4" />
                         </button>
                       )}
                     </div>
@@ -1014,7 +1073,7 @@ function DealDetailModal({
                       type="number"
                       value={paymentForm.amount}
                       onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                      className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 pl-5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
+                      className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 pl-5 text-sm dark:bg-[#212429] dark:text-zinc-100"
                       placeholder="0"
                       required
                     />
@@ -1026,7 +1085,7 @@ function DealDetailModal({
                     type="date"
                     value={paymentForm.date}
                     onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })}
-                    className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
+                    className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-[#212429] dark:text-zinc-100"
                     required
                   />
                 </div>
@@ -1036,7 +1095,7 @@ function DealDetailModal({
                 <select
                   value={paymentForm.method}
                   onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value as Payment['method'] })}
-                  className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-zinc-700 dark:text-zinc-100"
+                  className="w-full border dark:border-zinc-600 rounded px-2 py-1.5 text-sm dark:bg-[#212429] dark:text-zinc-100"
                   required
                 >
                   <option value="">Select method...</option>
@@ -1062,8 +1121,8 @@ function DealDetailModal({
                 </select>
               </div>
               {paymentForm.method === 'Cash' && (
-                <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded">
-                  ⚠️ Cash payments require admin verification
+                <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Cash payments require admin verification
                 </p>
               )}
               <div className="flex gap-2">
