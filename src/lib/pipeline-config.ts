@@ -138,17 +138,27 @@ export const EXCLUDED_STAGE_NAMES = new Set([
   'pre-qual', 'uncategorized', 'recall',
 ])
 
-// Get super stage from tags (returns first match, or null)
+// Get super stage from tags - returns the FURTHEST stage found (later stages win)
 export function getSuperStageByTags(tags: string[]): SuperStage | null {
   if (!tags || tags.length === 0) return null
   
+  let bestStage: SuperStage | null = null
+  let bestOrder = -1
+  
   for (const tag of tags) {
     const normalized = tag.toLowerCase().trim()
-    if (TAG_TO_SUPER[normalized]) {
-      return TAG_TO_SUPER[normalized]
+    const stage = TAG_TO_SUPER[normalized]
+    if (stage) {
+      const order = STAGE_CONFIG[stage].order
+      // Cold (order 6) should NOT override active stages - treat it as lowest priority for tag matching
+      const effectiveOrder = stage === 'cold' ? -1 : order
+      if (effectiveOrder > bestOrder) {
+        bestStage = stage
+        bestOrder = effectiveOrder
+      }
     }
   }
-  return null
+  return bestStage
 }
 
 // Get super stage from stage NAME (case-insensitive)
