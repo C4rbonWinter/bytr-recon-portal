@@ -395,12 +395,6 @@ export default function Dashboard() {
     ? allDeals.filter(d => d.salesperson === currentUser.name || d.sharedWith === currentUser.name)
     : allDeals
 
-  // Stats (based on user's visible deals)
-  const totalPlanned = deals.reduce((sum, d) => sum + d.planTotal, 0)
-  const totalCollected = deals.reduce((sum, d) => sum + d.collected, 0)
-  const totalPending = totalPlanned - totalCollected
-  const flaggedCount = deals.filter(d => d.status === 'flagged' || d.status === 'partial').length
-
   // Unverified cash payments for notifications
   const unverifiedPayments = allDeals.flatMap(deal => 
     deal.payments
@@ -441,6 +435,12 @@ export default function Dashboard() {
     
     return true
   })
+
+  // Stats based on filtered deals (correlates with time period filter)
+  const totalPlanned = filteredDeals.reduce((sum, d) => sum + d.planTotal, 0)
+  const totalCollected = filteredDeals.reduce((sum, d) => sum + d.collected, 0)
+  const totalPending = totalPlanned - totalCollected
+  const flaggedCount = filteredDeals.filter(d => d.status === 'flagged' || d.status === 'partial').length
 
   const formatCurrency = (amount: number) => {
     const hasDecimals = amount % 1 !== 0
