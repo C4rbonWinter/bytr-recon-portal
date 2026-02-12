@@ -10,18 +10,15 @@ import {
 import { Header } from '@/components/header'
 
 // Simulated users for "View As" feature (matches Pipeline page)
-// Josh and Chris have both admin (All) and personal (Mine) views since they're manager-salespeople
-// filterName is used for database matching (without the suffix)
+// isManager: true = can toggle between personal and admin view
 const USERS = [
-  { id: 'admin', name: 'Cole', filterName: 'Cole', role: 'admin' as const },
-  { id: 'josh-all', name: 'Josh (All)', filterName: 'Josh', role: 'admin' as const },
-  { id: 'josh-mine', name: 'Josh (Mine)', filterName: 'Josh', role: 'salesperson' as const },
-  { id: 'chris-all', name: 'Chris (All)', filterName: 'Chris', role: 'admin' as const },
-  { id: 'chris-mine', name: 'Chris (Mine)', filterName: 'Chris', role: 'salesperson' as const },
-  { id: 'molly', name: 'Molly', filterName: 'Molly', role: 'salesperson' as const },
-  { id: 'scot', name: 'Scot', filterName: 'Scot', role: 'salesperson' as const },
-  { id: 'jake', name: 'Jake', filterName: 'Jake', role: 'salesperson' as const },
-  { id: 'blake', name: 'Blake', filterName: 'Blake', role: 'salesperson' as const },
+  { id: 'admin', name: 'Cole', role: 'admin' as const, isManager: false },
+  { id: 'josh', name: 'Josh', role: 'admin' as const, isManager: true },
+  { id: 'chris', name: 'Chris', role: 'admin' as const, isManager: true },
+  { id: 'molly', name: 'Molly', role: 'salesperson' as const, isManager: false },
+  { id: 'scot', name: 'Scot', role: 'salesperson' as const, isManager: false },
+  { id: 'jake', name: 'Jake', role: 'salesperson' as const, isManager: false },
+  { id: 'blake', name: 'Blake', role: 'salesperson' as const, isManager: false },
 ]
 
 const VIEW_AS_OPTIONS = USERS.map(u => ({ id: u.id, name: u.name }))
@@ -239,17 +236,24 @@ export default function Dashboard() {
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
   const [viewAsUser, setViewAsUser] = useState(USERS[0])
+  const [showMyView, setShowMyView] = useState(false) // Toggle for managers: false = All, true = Mine
 
+  // For managers with toggle: if showMyView is true, act as salesperson
+  const effectiveRole = viewAsUser.isManager && showMyView ? 'salesperson' : viewAsUser.role
+  
   // Get user from viewAs selection
   const currentUser: User = {
     name: viewAsUser.name,
-    role: viewAsUser.role,
+    role: effectiveRole,
   }
 
-  const isSalesperson = currentUser.role === 'salesperson'
+  const isSalesperson = effectiveRole === 'salesperson'
   
   const handleViewAsChange = (id: string) => {
-    setViewAsUser(USERS.find(u => u.id === id) || USERS[0])
+    const user = USERS.find(u => u.id === id) || USERS[0]
+    setViewAsUser(user)
+    // Reset toggle when switching users
+    setShowMyView(false)
   }
 
   // Fetch deals from API
@@ -395,8 +399,7 @@ export default function Dashboard() {
   }
 
   // Filter to user's deals only for salespeople (include shared deals)
-  // Use filterName for database matching (handles "Josh (Mine)" → "Josh")
-  const filterName = viewAsUser.filterName
+  const filterName = viewAsUser.name
   const deals = isSalesperson 
     ? allDeals.filter(d => d.salesperson === filterName || d.sharedWith === filterName)
     : allDeals
@@ -473,6 +476,34 @@ export default function Dashboard() {
       />
 
       <main className="max-w-[1800px] mx-auto px-6 py-6">
+        {/* Manager toggle */}
+        {viewAsUser.isManager && (
+          <div className="mb-4 flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">View:</span>
+            <button
+              onClick={() => setShowMyView(false)}
+              className={`px-3 py-1 text-sm rounded-l-md border transition-colors ${
+                !showMyView 
+                  ? 'bg-primary text-primary-foreground border-primary' 
+                  : 'bg-card border-border hover:bg-secondary'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setShowMyView(true)}
+              className={`px-3 py-1 text-sm rounded-r-md border-t border-r border-b -ml-px transition-colors ${
+                showMyView 
+                  ? 'bg-primary text-primary-foreground border-primary' 
+                  : 'bg-card border-border hover:bg-secondary'
+              }`}
+            >
+              Mine
+            </button>
+          </div>
+        )}
+
+        {/* Salesperson info banner */}
         {isSalesperson && (
           <div className="mb-4 px-4 py-2 bg-chart-5/10 rounded-lg text-sm text-chart-5">
             Viewing as <strong>{currentUser.name}</strong> — showing only their assigned deals
