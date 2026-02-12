@@ -5,7 +5,8 @@ import { useSession } from 'next-auth/react'
 import { 
   CheckCircle2, AlertTriangle, XCircle, Flag, FileSpreadsheet,
   Banknote, CreditCard, Cherry, Heart, FileText, Landmark, Receipt,
-  Asterisk, Sun, Building2, Shield, Zap, Users2, FileCheck, Check, X
+  Asterisk, Sun, Building2, Shield, Zap, Users2, FileCheck, Check, X,
+  ChevronUp, ChevronDown
 } from 'lucide-react'
 import { Header } from '@/components/header'
 
@@ -237,6 +238,8 @@ export default function Dashboard() {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
   const [viewAsUser, setViewAsUser] = useState(USERS[0])
   const [showMyView, setShowMyView] = useState(false) // Toggle for managers: false = All, true = Mine
+  const [sortColumn, setSortColumn] = useState<'patient' | 'clinic' | 'salesperson' | 'planTotal' | 'collected' | 'balance' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   // For managers with toggle: if showMyView is true, act as salesperson
   const effectiveRole = viewAsUser.isManager && showMyView ? 'salesperson' : viewAsUser.role
@@ -445,6 +448,57 @@ export default function Dashboard() {
     return true
   })
 
+  // Sort handler for table headers
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Sort filtered deals
+  const sortedDeals = [...filteredDeals].sort((a, b) => {
+    if (!sortColumn) return 0
+    
+    let aVal: string | number
+    let bVal: string | number
+    
+    switch (sortColumn) {
+      case 'patient':
+        aVal = a.patientName.toLowerCase()
+        bVal = b.patientName.toLowerCase()
+        break
+      case 'clinic':
+        aVal = a.clinic
+        bVal = b.clinic
+        break
+      case 'salesperson':
+        aVal = (a.salesperson || '').toLowerCase()
+        bVal = (b.salesperson || '').toLowerCase()
+        break
+      case 'planTotal':
+        aVal = a.planTotal
+        bVal = b.planTotal
+        break
+      case 'collected':
+        aVal = a.collected
+        bVal = b.collected
+        break
+      case 'balance':
+        aVal = a.planTotal - a.collected
+        bVal = b.planTotal - b.collected
+        break
+      default:
+        return 0
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
   // Stats based on filtered deals (correlates with time period filter)
   const totalPlanned = filteredDeals.reduce((sum, d) => sum + d.planTotal, 0)
   const totalCollected = filteredDeals.reduce((sum, d) => sum + d.collected, 0)
@@ -576,17 +630,67 @@ export default function Dashboard() {
           <table className="w-full">
             <thead className="bg-secondary border-b border-border">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Patient</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Clinic</th>
-                {!isSalesperson && <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Salesperson</th>}
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Plan Total</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Collected</th>
-                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Balance</th>
+                <th 
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort('patient')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Patient
+                    {sortColumn === 'patient' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                <th 
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort('clinic')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Clinic
+                    {sortColumn === 'clinic' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                {!isSalesperson && (
+                  <th 
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                    onClick={() => handleSort('salesperson')}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Salesperson
+                      {sortColumn === 'salesperson' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                    </span>
+                  </th>
+                )}
+                <th 
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort('planTotal')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Plan Total
+                    {sortColumn === 'planTotal' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                <th 
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort('collected')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Collected
+                    {sortColumn === 'collected' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                <th 
+                  className="text-left px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort('balance')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Balance
+                    {sortColumn === 'balance' && (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
                 <th className="text-center px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredDeals.map((deal) => (
+              {sortedDeals.map((deal) => (
                 <tr key={deal.id} className="hover:bg-secondary/50 cursor-pointer transition-colors" onClick={() => setSelectedDeal(deal)}>
                   <td className="px-4 py-3 font-medium text-foreground">
                     {deal.patientName}
