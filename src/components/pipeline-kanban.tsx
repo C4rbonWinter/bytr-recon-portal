@@ -526,13 +526,13 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   
   // Time period filter options
   const TIME_PERIODS = [
-    { value: 'all', label: 'All Time' },
     { value: 'this_month', label: 'This Month' },
     { value: 'last_month', label: 'Last Month' },
     { value: 'last_30', label: 'Last 30 Days' },
     { value: 'last_90', label: 'Last 90 Days' },
     { value: 'this_year', label: 'This Year' },
     { value: 'last_year', label: 'Last Year' },
+    { value: 'all', label: 'All Time' },
   ]
   
   // Get date range for filter
