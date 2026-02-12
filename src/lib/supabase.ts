@@ -67,7 +67,7 @@ export interface Payment {
   updated_at: string
 }
 
-// Fetch all deals with payments
+// Fetch all deals with payments - excludes test records
 export async function getDeals(): Promise<(Deal & { collected: number; payments: Payment[] })[]> {
   const { data: deals, error: dealsError } = await supabase
     .from('deals')
@@ -76,13 +76,20 @@ export async function getDeals(): Promise<(Deal & { collected: number; payments:
 
   if (dealsError) throw dealsError
 
+  // Filter out test records and specific test names
+  const excludeNames = ['test', 'josh summers', 'joshua summers']
+  const filteredDeals = (deals || []).filter(deal => {
+    const nameLower = (deal.patient_name || '').toLowerCase()
+    return !excludeNames.some(excluded => nameLower.includes(excluded))
+  })
+
   const { data: payments, error: paymentsError } = await supabase
     .from('payments')
     .select('*')
 
   if (paymentsError) throw paymentsError
 
-  return (deals || []).map(deal => {
+  return filteredDeals.map(deal => {
     const dealPayments = (payments || []).filter(p => p.deal_id === deal.id)
     const collected = dealPayments.reduce((sum, p) => sum + p.amount, 0)
     return { ...deal, collected, payments: dealPayments }

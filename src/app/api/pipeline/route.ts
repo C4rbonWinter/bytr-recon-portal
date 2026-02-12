@@ -98,9 +98,13 @@ export async function GET(request: NextRequest) {
       (overrides || []).map(o => [o.opportunity_id, o.super_stage as SuperStage])
     )
     
-    // Transform to pipeline cards
+    // Transform to pipeline cards - filter out test records
+    const excludeNames = ['test', 'josh summers', 'joshua summers']
     const cards: PipelineCard[] = (opportunities || [])
-      .filter(opp => !opp.name.toLowerCase().includes('test'))
+      .filter(opp => {
+        const nameLower = (opp.name || '').toLowerCase()
+        return !excludeNames.some(excluded => nameLower.includes(excluded))
+      })
       .map(opp => {
         // Use stage override if present, otherwise use stored stage
         const stage = stageOverrideMap.get(opp.id) || opp.super_stage as SuperStage
