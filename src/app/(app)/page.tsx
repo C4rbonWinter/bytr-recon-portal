@@ -664,6 +664,7 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
   const [formData, setFormData] = useState({
     patientName: '',
     clinic: '',
+    ghlContactId: '', // Required - must select from GHL search
     salesperson: isSalesperson ? filterName : '', // Auto-assign for salespeople
     sharedWith: '',
     dealType: '',
@@ -711,9 +712,9 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
     }
   }
 
-  // Debounced search
+  // Debounced search - clear ghlContactId when user types (forces re-selection)
   const handleNameChange = (value: string) => {
-    setFormData({ ...formData, patientName: value })
+    setFormData({ ...formData, patientName: value, ghlContactId: '' })
     // Simple debounce
     const timeoutId = setTimeout(() => searchPatients(value), 300)
     return () => clearTimeout(timeoutId)
@@ -725,6 +726,7 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
       ...formData,
       patientName: patient.name,
       clinic: patient.clinic,
+      ghlContactId: patient.id, // Store the GHL contact ID
       invoiceLink: patient.invoiceLink || '',
     })
     setShowResults(false)
@@ -733,9 +735,15 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Require selecting a patient from GHL search
+    if (!formData.ghlContactId) {
+      alert('Please select a patient from the search results')
+      return
+    }
     await onCreate({
       patientName: formData.patientName,
       clinic: formData.clinic,
+      ghlContactId: formData.ghlContactId, // Store the GHL contact ID
       salesperson: formData.salesperson,
       sharedWith: formData.sharedWith || null,
       dealType: formData.dealType,
@@ -804,12 +812,15 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
               </div>
             )}
             {showResults && searchResults.length === 0 && formData.patientName.length >= 2 && !isSearching && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#212429] border dark:border-zinc-600 rounded-lg shadow-lg p-3 text-sm text-gray-500 dark:text-zinc-400">
-                No patients found in GHL. You can still create a new deal.
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#212429] border dark:border-zinc-600 rounded-lg shadow-lg p-3 text-sm text-yellow-600 dark:text-yellow-400">
+                No patients found in GHL. Patient must exist in GHL to create a deal.
               </div>
             )}
-            {formData.invoiceLink && (
-              <div className="mt-1 text-xs text-success">Invoice linked from GHL</div>
+            {formData.ghlContactId && (
+              <div className="mt-1 text-xs text-success flex items-center gap-1">
+                <Check className="h-3 w-3" /> Linked to GHL ({formData.ghlContactId.slice(0, 8)}...)
+                {formData.invoiceLink && ' • Invoice found'}
+              </div>
             )}
           </div>
           {/* Only show salesperson dropdown for admins - salespeople auto-assigned */}
