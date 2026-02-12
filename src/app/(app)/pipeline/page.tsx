@@ -8,14 +8,18 @@ import { Header } from '@/components/header'
 // Each salesperson has multiple GHL user IDs (one per GHL instance)
 // role: 'Admin' = sees all opportunities + salesperson names on cards
 // role: 'Salesperson' = sees only their opportunities, no SP name on cards
+// Josh and Chris have both admin (All) and personal (Mine) views since they're manager-salespeople
+// filterName is used for database matching (without the suffix)
 const USERS = [
-  { id: 'admin', name: 'Cole', role: 'Admin', ghlUserIds: [] as string[] },
-  { id: 'josh', name: 'Josh', role: 'Admin', ghlUserIds: [] as string[] },
-  { id: 'chris', name: 'Chris', role: 'Admin', ghlUserIds: [] as string[] },
-  { id: 'molly', name: 'Molly', role: 'Salesperson', ghlUserIds: ['40OKojJlHK1QGWxobiFB', 'OYwn6OtVac85ljn26qle'] },
-  { id: 'scot', name: 'Scot', role: 'Salesperson', ghlUserIds: ['R2lQOlnfA2u3ozRUIA5a', 'qdkCS02nCbZhGmn0R8zE'] },
-  { id: 'jake', name: 'Jake', role: 'Salesperson', ghlUserIds: ['dIYBT07Gjs2KnrHqSWiH', '1pShLvH7qVgRjaMVp80p'] },
-  { id: 'blake', name: 'Blake', role: 'Salesperson', ghlUserIds: ['DRr7a8bJ3SYfc7Uaonle', 'drbfnr6OcLkSfSSxgev0'] },
+  { id: 'admin', name: 'Cole', filterName: 'Cole', role: 'Admin', ghlUserIds: [] as string[] },
+  { id: 'josh-all', name: 'Josh (All)', filterName: 'Josh', role: 'Admin', ghlUserIds: [] as string[] },
+  { id: 'josh-mine', name: 'Josh (Mine)', filterName: 'Josh', role: 'Salesperson', ghlUserIds: ['xGHzefX0G70ObVhtULtS', 'cnHNqiEGjpOOWVzsZnJe'] },
+  { id: 'chris-all', name: 'Chris (All)', filterName: 'Chris', role: 'Admin', ghlUserIds: [] as string[] },
+  { id: 'chris-mine', name: 'Chris (Mine)', filterName: 'Chris', role: 'Salesperson', ghlUserIds: ['W02cGzjo8DOEvq3EnNH5', 'MH14SnZ7liJIMIBd2mge'] },
+  { id: 'molly', name: 'Molly', filterName: 'Molly', role: 'Salesperson', ghlUserIds: ['40OKojJlHK1QGWxobiFB', 'OYwn6OtVac85ljn26qle'] },
+  { id: 'scot', name: 'Scot', filterName: 'Scot', role: 'Salesperson', ghlUserIds: ['R2lQOlnfA2u3ozRUIA5a', 'qdkCS02nCbZhGmn0R8zE'] },
+  { id: 'jake', name: 'Jake', filterName: 'Jake', role: 'Salesperson', ghlUserIds: ['dIYBT07Gjs2KnrHqSWiH', '1pShLvH7qVgRjaMVp80p'] },
+  { id: 'blake', name: 'Blake', filterName: 'Blake', role: 'Salesperson', ghlUserIds: ['DRr7a8bJ3SYfc7Uaonle', 'drbfnr6OcLkSfSSxgev0'] },
 ]
 
 const VIEW_AS_OPTIONS = USERS.map(u => ({ id: u.id, name: u.name }))
@@ -53,7 +57,7 @@ export default function PipelinePage() {
         <PipelineKanban 
           key={refreshKey}
           salespersonIds={isAdmin ? undefined : currentUser.ghlUserIds}
-          salespersonName={isAdmin ? undefined : currentUser.name}
+          salespersonName={isAdmin ? undefined : currentUser.filterName}
           isAdmin={isAdmin}
         />
       </main>

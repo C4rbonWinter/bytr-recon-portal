@@ -10,14 +10,18 @@ import {
 import { Header } from '@/components/header'
 
 // Simulated users for "View As" feature (matches Pipeline page)
+// Josh and Chris have both admin (All) and personal (Mine) views since they're manager-salespeople
+// filterName is used for database matching (without the suffix)
 const USERS = [
-  { id: 'admin', name: 'Cole', role: 'admin' as const },
-  { id: 'josh', name: 'Josh', role: 'admin' as const },
-  { id: 'chris', name: 'Chris', role: 'admin' as const },
-  { id: 'molly', name: 'Molly', role: 'salesperson' as const },
-  { id: 'scot', name: 'Scot', role: 'salesperson' as const },
-  { id: 'jake', name: 'Jake', role: 'salesperson' as const },
-  { id: 'blake', name: 'Blake', role: 'salesperson' as const },
+  { id: 'admin', name: 'Cole', filterName: 'Cole', role: 'admin' as const },
+  { id: 'josh-all', name: 'Josh (All)', filterName: 'Josh', role: 'admin' as const },
+  { id: 'josh-mine', name: 'Josh (Mine)', filterName: 'Josh', role: 'salesperson' as const },
+  { id: 'chris-all', name: 'Chris (All)', filterName: 'Chris', role: 'admin' as const },
+  { id: 'chris-mine', name: 'Chris (Mine)', filterName: 'Chris', role: 'salesperson' as const },
+  { id: 'molly', name: 'Molly', filterName: 'Molly', role: 'salesperson' as const },
+  { id: 'scot', name: 'Scot', filterName: 'Scot', role: 'salesperson' as const },
+  { id: 'jake', name: 'Jake', filterName: 'Jake', role: 'salesperson' as const },
+  { id: 'blake', name: 'Blake', filterName: 'Blake', role: 'salesperson' as const },
 ]
 
 const VIEW_AS_OPTIONS = USERS.map(u => ({ id: u.id, name: u.name }))
@@ -391,8 +395,10 @@ export default function Dashboard() {
   }
 
   // Filter to user's deals only for salespeople (include shared deals)
+  // Use filterName for database matching (handles "Josh (Mine)" → "Josh")
+  const filterName = viewAsUser.filterName
   const deals = isSalesperson 
-    ? allDeals.filter(d => d.salesperson === currentUser.name || d.sharedWith === currentUser.name)
+    ? allDeals.filter(d => d.salesperson === filterName || d.sharedWith === filterName)
     : allDeals
 
   // Unverified cash payments for notifications
@@ -592,7 +598,7 @@ export default function Dashboard() {
 
       {/* New Deal Modal */}
       {showNewDeal && (
-        <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} onCreate={handleCreateDeal} />
+        <NewDealModal onClose={() => setShowNewDeal(false)} currentUser={currentUser} filterName={filterName} onCreate={handleCreateDeal} />
       )}
 
       {/* Deal Detail Modal */}
@@ -621,13 +627,13 @@ interface GHLSearchResult {
   invoiceLink?: string
 }
 
-function NewDealModal({ onClose, currentUser, onCreate }: { onClose: () => void; currentUser: User; onCreate: (data: any) => Promise<void> }) {
+function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose: () => void; currentUser: User; filterName: string; onCreate: (data: any) => Promise<void> }) {
   const isSalesperson = currentUser.role === 'salesperson'
   
   const [formData, setFormData] = useState({
     patientName: '',
     clinic: '',
-    salesperson: isSalesperson ? currentUser.name : '', // Auto-assign for salespeople
+    salesperson: isSalesperson ? filterName : '', // Auto-assign for salespeople
     sharedWith: '',
     dealType: '',
     planTotal: '',
