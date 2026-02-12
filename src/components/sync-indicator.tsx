@@ -64,9 +64,9 @@ export function SyncIndicator({ className = '' }: SyncIndicatorProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* The dot */}
+      {/* The dot (8px, ~35% smaller than original 12px) */}
       <div 
-        className={`w-3 h-3 rounded-full ${colors[syncState.status]} cursor-help transition-all`}
+        className={`w-2 h-2 rounded-full ${colors[syncState.status]} cursor-help transition-all`}
         title={labels[syncState.status]}
       />
       
