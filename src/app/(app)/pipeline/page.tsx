@@ -53,6 +53,7 @@ export default function PipelinePage() {
         <PipelineKanban 
           key={refreshKey}
           salespersonIds={isAdmin ? undefined : currentUser.ghlUserIds}
+          salespersonName={isAdmin ? undefined : currentUser.name}
           isAdmin={isAdmin}
         />
       </main>

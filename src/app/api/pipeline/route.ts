@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const clinicFilter = searchParams.get('clinic')
   const salespersonIds = searchParams.get('salespersonIds')?.split(',').filter(Boolean)
+  const salespersonName = searchParams.get('salespersonName')
 
   try {
     const supabase = getSupabase()
@@ -63,7 +64,13 @@ export async function GET(request: NextRequest) {
       query = query.eq('clinic', clinicFilter)
     }
     
-    if (salespersonIds && salespersonIds.length > 0) {
+    // Filter by salesperson name - preferred for "View As" feature
+    // TODO: Add shared_with filter once column is added to opportunities table
+    if (salespersonName) {
+      query = query.eq('assigned_to_name', salespersonName)
+    }
+    // Fallback: filter by GHL user IDs (legacy)
+    else if (salespersonIds && salespersonIds.length > 0) {
       query = query.in('assigned_to_id', salespersonIds)
     }
     

@@ -284,10 +284,11 @@ function DroppableColumn({
 
 interface PipelineKanbanProps {
   salespersonIds?: string[]
+  salespersonName?: string
   isAdmin?: boolean
 }
 
-export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanbanProps) {
+export function PipelineKanban({ salespersonIds, salespersonName, isAdmin = true }: PipelineKanbanProps) {
   const [data, setData] = useState<PipelineData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -317,7 +318,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
       setLoading(true)
       const params = new URLSearchParams()
       if (clinicFilter) params.set('clinic', clinicFilter)
-      if (salespersonFilter) params.set('salesperson', salespersonFilter)
+      if (salespersonName) params.set('salespersonName', salespersonName)
+      else if (salespersonFilter) params.set('salespersonIds', salespersonFilter)
       const url = `/api/pipeline${params.toString() ? '?' + params.toString() : ''}`
       const response = await fetch(url)
       
@@ -342,7 +344,7 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
   
   useEffect(() => {
     fetchPipeline()
-  }, [clinicFilter, salespersonFilter])
+  }, [clinicFilter, salespersonFilter, salespersonName])
   
   // Fetch leaderboard with period filter for collections/fastest closer
   useEffect(() => {
