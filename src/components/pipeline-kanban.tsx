@@ -679,8 +679,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Total Collections</div>
-              <div className="text-2xl font-bold text-success tracking-tight">{filteredLeaderboard.totalCollections.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.totalCollections.name}</div>
+              <div className="text-2xl font-bold text-success tracking-tight">{filteredLeaderboard.totalCollections?.displayValue ?? '$0'}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.totalCollections?.name ?? '—'}</div>
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Biggest Pipeline</div>
@@ -689,8 +689,8 @@ export function PipelineKanban({ salespersonIds, isAdmin = true }: PipelineKanba
             </div>
             <div className="bg-card p-4 rounded-lg border border-border hover:border-primary/20 transition-colors">
               <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Fastest Closer</div>
-              <div className="text-2xl font-bold text-primary tracking-tight">{filteredLeaderboard.fastestCloser.displayValue}</div>
-              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.fastestCloser.name}</div>
+              <div className="text-2xl font-bold text-primary tracking-tight">{filteredLeaderboard.fastestCloser?.displayValue ?? '—'}</div>
+              <div className="text-sm text-muted-foreground font-medium mt-1">{filteredLeaderboard.fastestCloser?.name ?? '—'}</div>
             </div>
           </div>
         )}
