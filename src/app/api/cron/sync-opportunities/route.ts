@@ -13,7 +13,7 @@ function getStaticToken(clinic: string): string {
 }
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Allow up to 60 seconds for full sync
+export const maxDuration = 300 // Allow up to 5 minutes for historical sync
 
 interface GHLOpportunity {
   id: string
@@ -87,28 +87,58 @@ async function fetchClinicOpportunities(
     stageNames[stage.id] = stage.name
   }
   
-  // Fetch opportunities from sales pipeline (single batch, most recent)
-  const url = new URL(`https://services.leadconnectorhq.com/opportunities/search`)
-  url.searchParams.set('location_id', config.locationId)
-  url.searchParams.set('pipeline_id', config.salesPipelineId)
-  url.searchParams.set('limit', '100')
+  // Fetch ALL opportunities from sales pipeline (paginate until Nov 1, 2025)
+  const cutoffDate = new Date('2025-11-01T00:00:00Z')
+  const allOpportunities: GHLOpportunity[] = []
+  let startAfterId: string | null = null
+  let pageCount = 0
+  const maxPages = 20 // Safety limit: 20 pages * 100 = 2000 opportunities max
   
-  const oppsRes = await fetch(url.toString(), {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Version': '2021-07-28',
-    },
-  })
-  
-  if (!oppsRes.ok) {
-    console.error(`Failed to fetch opportunities for ${clinic}`)
-    return { opportunities: [], stageNames }
+  while (pageCount < maxPages) {
+    const url = new URL(`https://services.leadconnectorhq.com/opportunities/search`)
+    url.searchParams.set('location_id', config.locationId)
+    url.searchParams.set('pipeline_id', config.salesPipelineId)
+    url.searchParams.set('limit', '100')
+    if (startAfterId) {
+      url.searchParams.set('startAfterId', startAfterId)
+    }
+    
+    const oppsRes = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Version': '2021-07-28',
+      },
+    })
+    
+    if (!oppsRes.ok) {
+      console.error(`Failed to fetch opportunities for ${clinic} (page ${pageCount})`)
+      break
+    }
+    
+    const oppsData = await oppsRes.json()
+    const opportunities = oppsData.opportunities || []
+    
+    if (opportunities.length === 0) break
+    
+    allOpportunities.push(...opportunities)
+    pageCount++
+    
+    // Check if we've reached opportunities older than cutoff
+    const lastOpp = opportunities[opportunities.length - 1]
+    const lastCreatedAt = new Date(lastOpp.createdAt)
+    
+    // Get the next page cursor
+    startAfterId = oppsData.meta?.startAfterId || lastOpp.id
+    
+    // Stop if oldest in this batch is before cutoff OR no more pages
+    if (lastCreatedAt < cutoffDate || !oppsData.meta?.nextPageUrl) {
+      break
+    }
   }
   
-  const oppsData = await oppsRes.json()
-  const opportunities = oppsData.opportunities || []
+  console.log(`${clinic}: Fetched ${allOpportunities.length} opportunities across ${pageCount} pages`)
   
-  return { opportunities, stageNames }
+  return { opportunities: allOpportunities, stageNames }
 }
 
 export async function POST(request: NextRequest) {
