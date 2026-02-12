@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/refresh-ghl-tokens",
+      "schedule": "0 */12 * * *"
+    },
+    {
       "path": "/api/cron/sync-opportunities?clinic=TR01",
       "schedule": "*/5 * * * *"
     },
