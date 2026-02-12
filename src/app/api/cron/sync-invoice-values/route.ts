@@ -29,11 +29,22 @@ const CLINIC_CONFIG = {
 
 // Target stages (lowercase for matching)
 const TARGET_STAGES = new Set([
+  // Sales funnel stages
   'tx plan ready',
   'closing call',
   'agreement sent',
   'signed',
   'signed ',
+  'down payment',
+  'down payment ',
+  // Won stages (backfill)
+  'smile design',
+  'financials completed',
+  'pre surgery',
+  'surgery',
+  'surgery completed',
+  'after care',
+  'testimonial',
   'down payment',
   'down payment ',
 ])
