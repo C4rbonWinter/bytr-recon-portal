@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
-import { CLINIC_CONFIG, getSuperStageByName, getSalespersonName } from '@/lib/pipeline-config'
+import { CLINIC_CONFIG, determineSuperStage, getSalespersonName } from '@/lib/pipeline-config'
 
 // Use static Private Integration tokens (don't rotate like OAuth)
 function getStaticToken(clinic: string): string {
@@ -150,7 +150,16 @@ export async function POST(request: NextRequest) {
       const rows = opportunities
         .map(opp => {
           const stageName = stageNames[opp.pipelineStageId] || ''
-          const superStage = getSuperStageByName(stageName)
+          const tags = opp.contact?.tags || []
+          const monetaryValue = opp.monetaryValue || 0
+          
+          // Determine super stage with Won validation (requires invoice)
+          const superStage = determineSuperStage(
+            stageName,
+            tags,
+            opp.lastStageChangeAt,
+            monetaryValue
+          )
           
           // Skip if not in our tracked stages
           if (!superStage) return null
