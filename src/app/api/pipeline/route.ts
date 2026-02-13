@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { SUPER_STAGES, SuperStage, STAGE_CONFIG } from '@/lib/pipeline-config'
 import { getSupabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
+
+const ALLOWED_DOMAINS = ['@teethandrobots.com', '@bytr.ai']
+
+async function requireAuth(): Promise<{ authorized: boolean; email?: string }> {
+  const session = await getServerSession()
+  if (!session?.user?.email) {
+    return { authorized: false }
+  }
+  
+  const email = session.user.email.toLowerCase()
+  if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
+    return { authorized: false }
+  }
+  
+  return { authorized: true, email }
+}
 
 interface PipelineCard {
   id: string
@@ -46,6 +63,11 @@ function formatCurrency(amount: number): string {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   const searchParams = request.nextUrl.searchParams
   const clinicFilter = searchParams.get('clinic')
   const salespersonIds = searchParams.get('salespersonIds')?.split(',').filter(Boolean)

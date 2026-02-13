@@ -290,6 +290,7 @@ export default function Dashboard() {
           method: payment.method,
           paymentDate: payment.date,
           source: 'manual',
+          userEmail: session?.user?.email || '',
         }),
       })
       

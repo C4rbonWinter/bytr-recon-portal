@@ -90,8 +90,8 @@ async function getRefreshToken(companyKey: string): Promise<{ token: string | nu
   return { token: process.env[envVarName] || null, needsReauth: false };
 }
 
-// Mark a token as needing re-auth (called when 401 detected)
-async function markNeedsReauth(companyKey: string, error: string): Promise<void> {
+// Mark a token as needing re-auth (called when 401/scope errors detected)
+export async function markNeedsReauth(companyKey: string, error: string): Promise<void> {
   try {
     const supabase = getSupabase();
     await supabase

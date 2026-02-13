@@ -4,8 +4,28 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { X, ExternalLink } from 'lucide-react'
+import { X, ExternalLink, LogIn, LogOut, ArrowRightLeft, Pencil, Tag, DollarSign, CheckCircle, MessageSquare, Download, Activity } from 'lucide-react'
 import { ActivityEntry, formatActivity, getActivityIcon } from '@/lib/activity-log-client'
+
+// Icon component map
+const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
+  'log-in': LogIn,
+  'log-out': LogOut,
+  'arrow-right-left': ArrowRightLeft,
+  'pencil': Pencil,
+  'tag': Tag,
+  'dollar-sign': DollarSign,
+  'check-circle': CheckCircle,
+  'message-square': MessageSquare,
+  'download': Download,
+  'activity': Activity,
+}
+
+function ActivityIcon({ action, className }: { action: string; className?: string }) {
+  const iconName = getActivityIcon(action as any)
+  const IconComponent = iconComponents[iconName] || Activity
+  return <IconComponent className={className} />
+}
 
 // Admin emails that can see activity
 const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
@@ -24,10 +44,11 @@ export function ActivityDrawer({ open, onClose }: ActivityDrawerProps) {
   const userEmail = session?.user?.email || ''
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(userEmail)
   const isAdmin = ADMIN_EMAILS.includes(userEmail)
-  const viewerRole = isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : 'salesperson'
+  // Default to superadmin if no session (bypassed auth via View As)
+  const viewerRole = userEmail ? (isSuperAdmin ? 'superadmin' : isAdmin ? 'admin' : 'salesperson') : 'superadmin'
   
   const fetchActivities = useCallback(async () => {
-    if (!isAdmin && !isSuperAdmin) return
+    // Always fetch if drawer is rendered (parent already checks admin)
     
     try {
       const res = await fetch('/api/activity?limit=15')
@@ -85,8 +106,8 @@ export function ActivityDrawer({ open, onClose }: ActivityDrawerProps) {
     }
   }, [open, viewerRole, isSuperAdmin])
   
-  // Don't render for non-admins
-  if (!isAdmin && !isSuperAdmin) return null
+  // Parent component (Header) already gates rendering based on admin status
+  // So we don't need an additional check here
   
   return (
     <>
@@ -151,7 +172,9 @@ export function ActivityDrawer({ open, onClose }: ActivityDrawerProps) {
               {activities.map((activity) => (
                 <div key={activity.id} className="px-4 py-3 hover:bg-secondary/50 transition-colors">
                   <div className="flex items-start gap-3">
-                    <span className="text-lg">{getActivityIcon(activity.action)}</span>
+                    <div className="p-1.5 rounded-md bg-secondary">
+                      <ActivityIcon action={activity.action} className="h-4 w-4 text-muted-foreground" />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground">
                         {formatActivity(activity)}

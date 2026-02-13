@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPendingMoves, markSynced, markFailed } from '@/lib/sync-queue'
-import { getLocationToken } from '@/lib/ghl-oauth'
+import { getLocationToken, markNeedsReauth } from '@/lib/ghl-oauth'
 import { getSupabase } from '@/lib/supabase'
 import { CLINIC_CONFIG, SuperStage, STAGE_NAME_TO_SUPER } from '@/lib/pipeline-config'
 
@@ -218,9 +218,11 @@ export async function POST(request: NextRequest) {
       } else {
         await markFailed(move.id, result.error || 'Unknown error', move.attempts + 1)
         failed++
-        // Track companies that need re-auth
+        // Track companies that need re-auth AND mark in DB
         if (result.needsReauth && result.companyKey) {
           companiesNeedingReauth.add(result.companyKey)
+          // Actually mark the token in DB so token-status shows it correctly
+          await markNeedsReauth(result.companyKey, result.error || 'Scope/auth error')
         }
       }
     }

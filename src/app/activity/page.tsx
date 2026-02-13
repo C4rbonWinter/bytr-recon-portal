@@ -4,6 +4,27 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ActivityEntry, formatActivity, getActivityIcon, ActivityAction } from '@/lib/activity-log-client'
 import { createClient } from '@supabase/supabase-js'
+import { LogIn, LogOut, ArrowRightLeft, Pencil, Tag, DollarSign, CheckCircle, MessageSquare, Download, Activity, ChevronLeft } from 'lucide-react'
+
+// Icon component map
+const iconComponents: Record<string, React.ComponentType<{ className?: string }>> = {
+  'log-in': LogIn,
+  'log-out': LogOut,
+  'arrow-right-left': ArrowRightLeft,
+  'pencil': Pencil,
+  'tag': Tag,
+  'dollar-sign': DollarSign,
+  'check-circle': CheckCircle,
+  'message-square': MessageSquare,
+  'download': Download,
+  'activity': Activity,
+}
+
+function ActivityIcon({ action, className }: { action: string; className?: string }) {
+  const iconName = getActivityIcon(action as any)
+  const IconComponent = iconComponents[iconName] || Activity
+  return <IconComponent className={className} />
+}
 
 const ACTION_FILTERS: { value: ActivityAction | ''; label: string }[] = [
   { value: '', label: 'All Actions' },
@@ -161,9 +182,7 @@ export default function ActivityPage() {
                 onClick={() => router.push('/pipeline')}
                 className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <ChevronLeft className="w-5 h-5" />
               </button>
               <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
                 Activity Log
@@ -233,7 +252,9 @@ export default function ActivityPage() {
                   className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-xl">{getActivityIcon(activity.action)}</span>
+                    <div className="p-2 rounded-md bg-zinc-100 dark:bg-zinc-700">
+                      <ActivityIcon action={activity.action} className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-zinc-900 dark:text-zinc-100">
                         {formatActivity(activity)}

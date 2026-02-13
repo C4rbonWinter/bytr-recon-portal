@@ -3,6 +3,7 @@
 import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { Logo } from '@/components/logo'
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -11,7 +12,8 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">T+R Recon Portal</h1>
+        <Logo className="h-9 w-auto mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Sales Recon</h1>
         <p className="text-gray-500 mb-6">Sign in with your Teeth+Robots account</p>
         
         {error && (

@@ -1,5 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { getDeals, createDeal, updateDeal, findDeal } from '@/lib/supabase'
+
+// Allowed email domains
+const ALLOWED_DOMAINS = ['@teethandrobots.com', '@bytr.ai']
+
+async function requireAuth(request: NextRequest): Promise<{ authorized: boolean; email?: string }> {
+  // Check for API key (for cron/sync jobs)
+  const apiKey = request.headers.get('x-api-key')
+  if (apiKey === process.env.SYNC_API_KEY) {
+    return { authorized: true, email: 'sync@system' }
+  }
+  
+  // Check session
+  const session = await getServerSession()
+  if (!session?.user?.email) {
+    return { authorized: false }
+  }
+  
+  // Verify email domain
+  const email = session.user.email.toLowerCase()
+  if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
+    return { authorized: false }
+  }
+  
+  return { authorized: true, email }
+}
 
 // GHL API tokens for deal type sync
 const GHL_TOKENS: Record<string, string> = {
@@ -42,14 +68,12 @@ async function syncDealTypeToGHL(contactId: string, clinic: string, dealType: st
   }
 }
 
-const SYNC_API_KEY = process.env.SYNC_API_KEY || 'recon-sync-2026'
-
-function checkSyncAuth(request: NextRequest): boolean {
-  const apiKey = request.headers.get('x-api-key')
-  return apiKey === SYNC_API_KEY
-}
-
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const { searchParams } = new URL(request.url)
     const patientName = searchParams.get('patient_name')
@@ -74,6 +98,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const body = await request.json()
     
@@ -102,6 +131,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const body = await request.json()
     console.log('PATCH /api/deals received:', body)

@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // Exchange code for tokens
+    const redirectUri = 'https://sales.teethandrobots.com/api/oauth/callback'
     const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
         client_secret: clientSecret,
         grant_type: 'authorization_code',
         code: code,
+        redirect_uri: redirectUri,
       }),
     })
     

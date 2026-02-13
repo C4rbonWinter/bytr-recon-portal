@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { Bell, RefreshCw, Activity } from 'lucide-react'
+import { Bell, RefreshCw, Clock } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
 import { SyncIndicator } from '@/components/sync-indicator'
@@ -33,19 +33,60 @@ interface HeaderProps {
   onPaymentClick?: (dealId: string) => void
 }
 
-export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onViewAsChange, unverifiedPayments = [], onPaymentClick }: HeaderProps) {
+export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onViewAsChange, unverifiedPayments: propUnverifiedPayments, onPaymentClick }: HeaderProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showActivityDrawer, setShowActivityDrawer] = useState(false)
+  const [fetchedUnverifiedPayments, setFetchedUnverifiedPayments] = useState<UnverifiedPayment[]>([])
   
-  const isDeals = pathname === '/'
+  // Fetch unverified payments if not passed as prop
+  useEffect(() => {
+    if (propUnverifiedPayments === undefined) {
+      fetch('/api/deals')
+        .then(res => res.json())
+        .then(data => {
+          const deals = data.deals || []
+          const unverified = deals.flatMap((deal: any) => 
+            (deal.payments || [])
+              .filter((p: any) => p.method === 'Cash' && !p.verified)
+              .map((p: any) => ({
+                paymentId: p.id,
+                dealId: deal.id,
+                patientName: deal.patient_name,
+                amount: p.amount,
+                date: p.payment_date,
+              }))
+          )
+          setFetchedUnverifiedPayments(unverified)
+        })
+        .catch(() => {})
+    }
+  }, [propUnverifiedPayments])
+  
+  const unverifiedPayments = propUnverifiedPayments ?? fetchedUnverifiedPayments
+  
+  const handlePaymentClick = (dealId: string) => {
+    if (onPaymentClick) {
+      onPaymentClick(dealId)
+    } else {
+      // Navigate to deals page with the deal selected
+      router.push(`/deals?deal=${dealId}`)
+    }
+  }
+  
+  const isDeals = pathname === '/deals'
   const isPipeline = pathname === '/pipeline'
   const isActivity = pathname === '/activity'
   
   // Admin-only navigation (activity log)
+  // Check both NextAuth session AND View As selection (for bypassed auth)
   const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
-  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+  const ADMIN_VIEW_AS_IDS = ['admin', 'josh', 'chris'] // View As IDs that are admins
+  const isAdminByEmail = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
+  const isAdminByViewAs = currentViewAs && ADMIN_VIEW_AS_IDS.includes(currentViewAs)
+  const isAdmin = isAdminByEmail || isAdminByViewAs
   
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
@@ -64,7 +105,7 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
         {/* Center: Navigation */}
         <nav className="flex items-center gap-1 bg-secondary rounded-lg p-1">
           <Link 
-            href="/" 
+            href="/deals" 
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               isDeals 
                 ? 'bg-background text-foreground shadow-sm' 
@@ -83,22 +124,12 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
           >
             Pipeline
           </Link>
-          {isAdmin && (
-            <Link 
-              href="/activity" 
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isActivity 
-                  ? 'bg-background text-foreground shadow-sm' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-              }`}
-            >
-              Activity
-            </Link>
-          )}
         </nav>
         
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+          
           {/* Activity drawer button - admin only */}
           {isAdmin && (
             <button
@@ -106,14 +137,12 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
               className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-secondary"
               title="Activity Log"
             >
-              <Activity className="h-5 w-5" />
+              <Clock className="h-5 w-5" />
             </button>
           )}
           
-          <ThemeToggle />
-          
-          {/* Notifications Bell - unverified cash payments */}
-          {unverifiedPayments.length > 0 && (
+          {/* Notifications Bell - unverified cash payments (admin only) */}
+          {isAdmin && unverifiedPayments.length > 0 && (
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -135,7 +164,7 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
                       <button
                         key={payment.paymentId}
                         onClick={() => {
-                          onPaymentClick?.(payment.dealId)
+                          handlePaymentClick(payment.dealId)
                           setShowNotifications(false)
                         }}
                         className="w-full text-left px-4 py-3 hover:bg-secondary transition-colors border-b border-border last:border-b-0"
@@ -153,8 +182,8 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
             </div>
           )}
           
-          {/* View As Dropdown - shown on Pipeline */}
-          {viewAsOptions && onViewAsChange && (
+          {/* View As Dropdown - Cole only */}
+          {viewAsOptions && onViewAsChange && (session?.user?.email === 'cole@bytr.ai' || session?.user?.email === 'cole@teethandrobots.com') && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">View as:</span>
               <select

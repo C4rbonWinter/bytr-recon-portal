@@ -58,18 +58,18 @@ export function formatActivity(activity: ActivityEntry): string {
   }
 }
 
-// Get action icon/emoji
+// Get action icon name (Lucide icon names)
 export function getActivityIcon(action: ActivityAction): string {
   switch (action) {
-    case 'login': return '🔓'
-    case 'logout': return '🔒'
-    case 'deal_move': return '↔️'
-    case 'deal_update': return '✏️'
-    case 'deal_type_change': return '🏷️'
-    case 'payment_add': return '💰'
-    case 'payment_verify': return '✅'
-    case 'note_add': return '📝'
-    case 'export': return '📊'
-    default: return '📋'
+    case 'login': return 'log-in'
+    case 'logout': return 'log-out'
+    case 'deal_move': return 'arrow-right-left'
+    case 'deal_update': return 'pencil'
+    case 'deal_type_change': return 'tag'
+    case 'payment_add': return 'dollar-sign'
+    case 'payment_verify': return 'check-circle'
+    case 'note_add': return 'message-square'
+    case 'export': return 'download'
+    default: return 'activity'
   }
 }

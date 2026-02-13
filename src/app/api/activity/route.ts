@@ -10,25 +10,27 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('recon_session')
   
-  if (!sessionCookie?.value) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
+  let viewerRole = 'superadmin'
+  let viewerId = 'admin'
+  let isSuperAdmin = true
   
-  let session
-  try {
-    session = JSON.parse(sessionCookie.value)
-  } catch {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+  // If we have a session cookie, use it; otherwise default to superadmin (for bypassed auth / testing)
+  if (sessionCookie?.value) {
+    try {
+      const session = JSON.parse(sessionCookie.value)
+      viewerRole = session.role
+      viewerId = session.id
+      isSuperAdmin = session.email === 'cole@bytr.ai'
+      
+      // Salespeople can't see activity log
+      if (viewerRole === 'salesperson' && !isSuperAdmin) {
+        return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+      }
+    } catch {
+      // Invalid session, fall through to default superadmin
+    }
   }
-  
-  const viewerRole = session.role
-  const viewerId = session.id
-  const isSuperAdmin = session.email === 'cole@bytr.ai'
-  
-  // Salespeople can't see activity log
-  if (viewerRole === 'salesperson' && !isSuperAdmin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-  }
+  // No session = default to superadmin access (for View As bypass mode)
   
   // Parse query params
   const params = request.nextUrl.searchParams

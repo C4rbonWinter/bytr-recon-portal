@@ -11,17 +11,24 @@ export async function GET(request: NextRequest) {
   }
   
   // The redirect URI must match what's configured in the GHL app
-  const redirectUri = 'https://recon-portal-bytr.vercel.app/api/oauth/callback'
+  const redirectUri = 'https://sales.teethandrobots.com/api/oauth/callback'
   
   const scopes = [
+    'contacts.readonly',
+    'contacts.write',
     'opportunities.readonly',
     'opportunities.write',
-    'contacts.readonly',
-    'contacts.write',  // Needed for deal_type custom field updates
     'locations.readonly',
+    'locations/customFields.readonly',
+    'locations/customFields.write',
+    'locations/customValues.readonly',
+    'locations/customValues.write',
   ].join(' ')
   
-  const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`
+  // Extract version_id (app ID without the suffix)
+  const versionId = clientId.split('-')[0]
+  
+  const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&version_id=${versionId}`
   
   return NextResponse.json({
     message: 'Visit this URL to authorize the app for a GHL location:',

@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { getPayments, createPayment, deletePayment, verifyPayment } from '@/lib/supabase'
 
+// Admins can auto-verify cash payments
+const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
+const ALLOWED_DOMAINS = ['@teethandrobots.com', '@bytr.ai']
+
+async function requireAuth(): Promise<{ authorized: boolean; email?: string }> {
+  const session = await getServerSession()
+  if (!session?.user?.email) {
+    return { authorized: false }
+  }
+  
+  const email = session.user.email.toLowerCase()
+  if (!ALLOWED_DOMAINS.some(domain => email.endsWith(domain))) {
+    return { authorized: false }
+  }
+  
+  return { authorized: true, email }
+}
+
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const { searchParams } = new URL(request.url)
     const dealId = searchParams.get('dealId') || undefined
@@ -19,19 +43,29 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const body = await request.json()
     
     const isCash = body.method === 'Cash'
+    const userEmail = body.userEmail || ''
+    const isAdmin = ADMIN_EMAILS.includes(userEmail)
+    
+    // Cash needs verification UNLESS added by an admin
+    const needsVerification = isCash && !isAdmin
     
     const payment = await createPayment({
       deal_id: body.dealId,
       amount: parseFloat(body.amount) || 0,
       method: body.method,
       payment_date: body.paymentDate || new Date().toISOString().split('T')[0],
-      verified: !isCash,
-      verified_by: isCash ? '' : 'system',
-      verified_at: isCash ? '' : new Date().toISOString(),
+      verified: !needsVerification,
+      verified_by: needsVerification ? '' : (isAdmin ? userEmail : 'system'),
+      verified_at: needsVerification ? '' : new Date().toISOString(),
       source: body.source || 'manual',
       external_ref: body.externalRef || '',
     })
@@ -47,6 +81,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const body = await request.json()
     const { id, verified, verifiedBy } = body
@@ -68,6 +107,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
