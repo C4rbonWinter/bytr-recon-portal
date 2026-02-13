@@ -36,6 +36,18 @@ const DEAL_TYPES = [
   'Other',
 ]
 
+// GHL Location IDs by clinic
+const GHL_LOCATION_IDS: Record<string, string> = {
+  'TR01': 'cl9YH8PZgv32HEz5pIXT',  // San Gabriel
+  'TR02': 'DJfIuAH1tTxRRBEufitL',  // Irvine
+  'TR04': '1isaYfEkvNkyLH3XepI5',  // Las Vegas
+}
+
+function getGhlContactUrl(clinic: string, contactId: string): string {
+  const locationId = GHL_LOCATION_IDS[clinic] || GHL_LOCATION_IDS['TR01']
+  return `https://app.gohighlevel.com/v2/location/${locationId}/contacts/detail/${contactId}`
+}
+
 interface PipelineCard {
   id: string
   name: string
@@ -814,7 +826,7 @@ export function PipelineKanban({ salespersonIds, salespersonName, isAdmin = true
               
               <div className="mt-4 pt-4 border-t border-border flex gap-2">
                 <a
-                  href={`https://app.gohighlevel.com/contacts/${selectedCard.contactId}`}
+                  href={getGhlContactUrl(selectedCard.clinic, selectedCard.contactId)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 text-center px-4 py-2 bg-secondary text-foreground border border-border rounded-lg hover:bg-secondary/80 transition-colors font-medium"
