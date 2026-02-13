@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getSalespersonName, SALESPERSON_IDS, CLINIC_CONFIG } from '@/lib/pipeline-config'
+import { getSupabase } from '@/lib/supabase'
 
 // Force dynamic rendering (not static) so env vars are available at runtime
 export const dynamic = 'force-dynamic'
-
-// Create Supabase client lazily to avoid build-time errors
-function getSupabase() {
-  return createClient(
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!
-  )
-}
 
 // GHL API tokens - access lazily at runtime to ensure env vars are available
 function getGHLToken(clinic: string): string {
@@ -269,11 +261,11 @@ export async function GET(request: NextRequest) {
     const formatCurrency = (n: number) => 
       new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
     
-    // Deals Won leader
+    // Deals Won leader - use dealsWonByPerson directly (more reliable than salesStats)
     let dealsWonLeader: LeaderboardEntry = { name: '—', value: 0, displayValue: '0' }
-    for (const [name, stats] of Object.entries(salesStats)) {
-      if (stats.dealsWon > dealsWonLeader.value) {
-        dealsWonLeader = { name, value: stats.dealsWon, displayValue: stats.dealsWon.toString() }
+    for (const [name, count] of Object.entries(dealsWonByPerson)) {
+      if (count > dealsWonLeader.value) {
+        dealsWonLeader = { name, value: count, displayValue: count.toString() }
       }
     }
     
