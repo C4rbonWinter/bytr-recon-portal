@@ -3,6 +3,12 @@ import { getTokenStatus } from '@/lib/ghl-oauth'
 
 export const dynamic = 'force-dynamic'
 
+// Friendly names for iMessage alerts
+const COMPANY_NAMES: Record<string, string> = {
+  vegas: 'Teeth+Robots Vegas',
+  salesjet: 'SalesJet (SG + Irvine)',
+}
+
 // Check GHL token status - which companies need re-auth
 export async function GET() {
   try {
@@ -12,6 +18,7 @@ export async function GET() {
       .filter(([_, v]) => v.needsReauth)
       .map(([k, v]) => ({
         company: k,
+        name: COMPANY_NAMES[k] || k,
         since: v.needsReauthAt,
         error: v.lastError,
       }))
