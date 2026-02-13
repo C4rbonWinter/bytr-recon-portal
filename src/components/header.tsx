@@ -39,6 +39,11 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
   
   const isDeals = pathname === '/'
   const isPipeline = pathname === '/pipeline'
+  const isActivity = pathname === '/activity'
+  
+  // Admin-only navigation (activity log)
+  const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
+  const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email)
   
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
@@ -76,6 +81,18 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
           >
             Pipeline
           </Link>
+          {isAdmin && (
+            <Link 
+              href="/activity" 
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                isActivity 
+                  ? 'bg-background text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+            >
+              Activity
+            </Link>
+          )}
         </nav>
         
         {/* Right: Actions */}

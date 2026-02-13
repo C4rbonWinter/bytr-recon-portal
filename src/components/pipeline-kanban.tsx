@@ -435,6 +435,7 @@ export function PipelineKanban({ salespersonIds, salespersonName, isAdmin = true
           clinic: sourceCard.clinic,
           fromStage: sourceStage,
           toStage: targetStage,
+          dealName: sourceCard.name,
         }),
       })
       
