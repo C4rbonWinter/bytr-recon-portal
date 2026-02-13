@@ -63,17 +63,23 @@ function getClientCredentials() {
 }
 
 // Get refresh token from Supabase (with fallback to env vars for initial setup)
-async function getRefreshToken(companyKey: string): Promise<string | null> {
+// Also checks if token needs re-auth
+async function getRefreshToken(companyKey: string): Promise<{ token: string | null; needsReauth: boolean }> {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('ghl_tokens')
-      .select('refresh_token')
+      .select('refresh_token, needs_reauth')
       .eq('id', companyKey)
       .single();
     
+    if (data?.needs_reauth) {
+      console.log(`Token for ${companyKey} marked as needs_reauth - skipping`);
+      return { token: null, needsReauth: true };
+    }
+    
     if (data?.refresh_token) {
-      return data.refresh_token;
+      return { token: data.refresh_token, needsReauth: false };
     }
   } catch (err) {
     console.log(`Token lookup failed for ${companyKey}, trying env var fallback`);
@@ -81,7 +87,43 @@ async function getRefreshToken(companyKey: string): Promise<string | null> {
   
   // Fallback to env vars (for initial setup or if DB fails)
   const envVarName = companyKey === 'vegas' ? 'GHL_OAUTH_VEGAS_REFRESH' : 'GHL_OAUTH_SALESJET_REFRESH';
-  return process.env[envVarName] || null;
+  return { token: process.env[envVarName] || null, needsReauth: false };
+}
+
+// Mark a token as needing re-auth (called when 401 detected)
+async function markNeedsReauth(companyKey: string, error: string): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    await supabase
+      .from('ghl_tokens')
+      .update({
+        needs_reauth: true,
+        needs_reauth_at: new Date().toISOString(),
+        last_error: error,
+      })
+      .eq('id', companyKey);
+    console.log(`⚠️ Marked ${companyKey} as needs_reauth`);
+  } catch (err) {
+    console.error(`Failed to mark ${companyKey} as needs_reauth:`, err);
+  }
+}
+
+// Clear needs_reauth flag (called after successful OAuth)
+export async function clearNeedsReauth(companyKey: string): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    await supabase
+      .from('ghl_tokens')
+      .update({
+        needs_reauth: false,
+        needs_reauth_at: null,
+        last_error: null,
+      })
+      .eq('id', companyKey);
+    console.log(`✓ Cleared needs_reauth for ${companyKey}`);
+  } catch (err) {
+    console.error(`Failed to clear needs_reauth for ${companyKey}:`, err);
+  }
 }
 
 // Save new tokens to Supabase after refresh
@@ -114,6 +156,16 @@ async function saveTokens(
   }
 }
 
+// Custom error class for re-auth required
+class ReauthRequiredError extends Error {
+  companyKey: string;
+  constructor(companyKey: string, message: string) {
+    super(message);
+    this.name = 'ReauthRequiredError';
+    this.companyKey = companyKey;
+  }
+}
+
 // Step 1: Get Company-level access token using refresh token
 async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): Promise<string> {
   const config = COMPANY_CONFIGS[companyKey];
@@ -126,7 +178,13 @@ async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): 
   }
   
   // Get refresh token from DB or env
-  const refreshToken = await getRefreshToken(companyKey);
+  const { token: refreshToken, needsReauth } = await getRefreshToken(companyKey);
+  
+  // If already marked as needs_reauth, don't even try
+  if (needsReauth) {
+    throw new ReauthRequiredError(companyKey, `Token for ${companyKey} requires re-authorization`);
+  }
+  
   if (!refreshToken) {
     throw new Error(`No refresh token available for ${companyKey}`);
   }
@@ -147,6 +205,14 @@ async function getCompanyAccessToken(companyKey: keyof typeof COMPANY_CONFIGS): 
   if (!response.ok) {
     const error = await response.text();
     console.error(`Company token refresh failed for ${companyKey}:`, error);
+    
+    // Check if this is an auth error that requires re-auth
+    const status = response.status;
+    if (status === 401 || status === 400 || error.includes('invalid_grant') || error.includes('expired')) {
+      await markNeedsReauth(companyKey, `Token refresh failed: ${status} - ${error}`);
+      throw new ReauthRequiredError(companyKey, `Token expired for ${companyKey}, re-auth required`);
+    }
+    
     throw new Error(`Failed to refresh company token: ${error}`);
   }
   
@@ -269,15 +335,44 @@ export async function getLocationToken(
     const accessToken = await getLocationAccessToken(locationId);
     return { success: true, accessToken };
   } catch (error) {
+    // Check if this is specifically a re-auth required error
+    if (error instanceof ReauthRequiredError) {
+      return { 
+        success: false, 
+        error: error.message, 
+        needsReauth: true, 
+        companyKey: error.companyKey 
+      };
+    }
+    
     const errorStr = String(error);
     // Detect 401/scope errors that require re-auth
     const needsReauth = errorStr.includes('401') || 
                         errorStr.includes('not authorized') ||
                         errorStr.includes('unauthorized') ||
-                        errorStr.includes('invalid_grant');
+                        errorStr.includes('invalid_grant') ||
+                        errorStr.includes('re-auth required');
     const companyKey = LOCATION_TO_COMPANY[locationId];
     return { success: false, error: errorStr, needsReauth, companyKey };
   }
+}
+
+// Check which tokens need re-auth (for status display)
+export async function getTokenStatus(): Promise<Record<string, { needsReauth: boolean; lastError?: string; needsReauthAt?: string }>> {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from('ghl_tokens')
+    .select('id, needs_reauth, last_error, needs_reauth_at');
+  
+  const status: Record<string, { needsReauth: boolean; lastError?: string; needsReauthAt?: string }> = {};
+  for (const row of data || []) {
+    status[row.id] = {
+      needsReauth: row.needs_reauth || false,
+      lastError: row.last_error,
+      needsReauthAt: row.needs_reauth_at,
+    };
+  }
+  return status;
 }
 
 // Seed initial tokens from env vars to Supabase (run once during setup)

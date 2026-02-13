@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       companyKey = 'salesjet'
     }
     
-    // Store in Supabase
+    // Store in Supabase and clear needs_reauth flag
     const supabase = getSupabase()
     await supabase
       .from('ghl_tokens')
@@ -59,6 +59,10 @@ export async function GET(request: NextRequest) {
         access_token: tokens.access_token,
         access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
         updated_at: new Date().toISOString(),
+        // Clear re-auth flags on successful auth
+        needs_reauth: false,
+        needs_reauth_at: null,
+        last_error: null,
       })
     
     return new NextResponse(`
