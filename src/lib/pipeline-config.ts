@@ -90,8 +90,10 @@ export const STAGE_NAME_TO_SUPER: Record<string, SuperStage> = {
   // Closing
   'closing call': 'closing',
   'negotiation': 'closing',
-  'signed': 'closing',
-  'signed ': 'closing',  // Note: some have trailing space
+  
+  // Signed (patient has signed agreements)
+  'signed': 'signed',
+  'signed ': 'signed',  // Note: some have trailing space
   
   // Financing
   'finance link sent': 'financing',
