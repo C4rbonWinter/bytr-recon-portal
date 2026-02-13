@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing OAuth credentials' }, { status: 500 })
   }
   
+  // Debug: show what credentials we're using (masked)
+  const maskedId = clientId.substring(0, 10) + '...' + clientId.slice(-8)
+  const maskedSecret = clientSecret.substring(0, 8) + '...' + clientSecret.slice(-4)
+  console.log(`OAuth callback using clientId=${maskedId}, secret=${maskedSecret}`)
+  
   try {
     // Exchange code for tokens
     const redirectUri = 'https://sales.teethandrobots.com/api/oauth/callback'
@@ -35,7 +40,14 @@ export async function GET(request: NextRequest) {
     
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text()
-      return NextResponse.json({ error: `Token exchange failed: ${error}` }, { status: 500 })
+      return NextResponse.json({ 
+        error: `Token exchange failed: ${error}`,
+        debug: {
+          clientId: maskedId,
+          secret: maskedSecret,
+          redirectUri,
+        }
+      }, { status: 500 })
     }
     
     const tokens = await tokenResponse.json()
