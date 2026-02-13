@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { Bell, RefreshCw } from 'lucide-react'
+import { Bell, RefreshCw, Activity } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Logo } from '@/components/logo'
 import { SyncIndicator } from '@/components/sync-indicator'
+import { ActivityDrawer } from '@/components/activity-drawer'
 
 interface ViewAsOption {
   id: string
@@ -36,6 +37,7 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
   const pathname = usePathname()
   const { data: session } = useSession()
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showActivityDrawer, setShowActivityDrawer] = useState(false)
   
   const isDeals = pathname === '/'
   const isPipeline = pathname === '/pipeline'
@@ -97,6 +99,17 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
         
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+          {/* Activity drawer button - admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowActivityDrawer(true)}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-secondary"
+              title="Activity Log"
+            >
+              <Activity className="h-5 w-5" />
+            </button>
+          )}
+          
           <ThemeToggle />
           
           {/* Notifications Bell - unverified cash payments */}
@@ -188,6 +201,14 @@ export function Header({ onNewDeal, onRefresh, viewAsOptions, currentViewAs, onV
           {isPipeline && <SyncIndicator />}
         </div>
       </div>
+      
+      {/* Activity Drawer */}
+      {isAdmin && (
+        <ActivityDrawer 
+          open={showActivityDrawer} 
+          onClose={() => setShowActivityDrawer(false)} 
+        />
+      )}
     </header>
   )
 }
