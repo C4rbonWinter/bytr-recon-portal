@@ -311,11 +311,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Fastest Closer leader (lowest average time from lead assignment to first payment, minimum 2 closes)
+    // Fastest Closer leader (lowest average time from lead assignment to first payment, minimum 1 close)
     let fastestCloser: LeaderboardEntry = { name: '—', value: 0, displayValue: '—' }
     let lowestAvgMs = Infinity
     for (const [name, stats] of Object.entries(salesStats)) {
-      if (stats.closeTimesMs.length >= 2) {
+      if (stats.closeTimesMs.length >= 1) {
         const avgMs = stats.closeTimesMs.reduce((a, b) => a + b, 0) / stats.closeTimesMs.length
         if (avgMs < lowestAvgMs) {
           lowestAvgMs = avgMs
