@@ -227,19 +227,45 @@ async function main() {
     });
   }
   
-  // Output summary
-  if (changes.length > 0) {
-    console.log('\n📊 CHANGES DETECTED:');
+  // Auto-update portal with changes
+  const autoUpdate = !process.argv.includes('--no-update');
+  const updated: InvoiceChange[] = [];
+  
+  if (changes.length > 0 && autoUpdate) {
+    console.log('\n🔄 AUTO-UPDATING PORTAL:');
+    console.log('─'.repeat(60));
+    
+    for (const change of changes) {
+      if (change.dealId) {
+        const { error } = await supabase
+          .from('deals')
+          .update({
+            plan_total: change.newAmount,
+            notes: `Invoice auto-synced ${new Date().toLocaleDateString()}: $${change.oldAmount?.toLocaleString()} → $${change.newAmount.toLocaleString()}`
+          })
+          .eq('id', change.dealId);
+        
+        if (error) {
+          console.log(`❌ ${change.patientName}: Failed to update - ${error.message}`);
+        } else {
+          console.log(`✅ ${change.patientName}: $${change.oldAmount?.toLocaleString()} → $${change.newAmount.toLocaleString()}`);
+          updated.push(change);
+        }
+      }
+    }
+    console.log('─'.repeat(60));
+  } else if (changes.length > 0) {
+    // Just report without updating
+    console.log('\n📊 CHANGES DETECTED (not updating):');
     console.log('─'.repeat(60));
     for (const change of changes) {
       console.log(`${change.patientName}`);
       console.log(`  Portal: $${change.oldAmount?.toLocaleString()} → Invoice: $${change.newAmount.toLocaleString()}`);
-      console.log(`  Diff: ${change.newAmount - (change.oldAmount || 0) > 0 ? '+' : ''}$${(change.newAmount - (change.oldAmount || 0)).toLocaleString()}`);
     }
     console.log('─'.repeat(60));
   }
   
-  return { changes, checked: modifiedFiles.length };
+  return { changes, updated, checked: modifiedFiles.length };
 }
 
 // Export for use as module
