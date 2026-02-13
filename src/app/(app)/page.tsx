@@ -232,6 +232,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [clinicFilter, setClinicFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [salespersonFilter, setSalespersonFilter] = useState<string>('all')
   const [monthFilter, setMonthFilter] = useState<string>('this_month')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showNewDeal, setShowNewDeal] = useState(false)
@@ -432,6 +433,7 @@ export default function Dashboard() {
   const filteredDeals = deals.filter(d => {
     if (clinicFilter !== 'all' && d.clinic !== clinicFilter) return false
     if (statusFilter !== 'all' && d.status !== statusFilter) return false
+    if (salespersonFilter !== 'all' && getSalespersonDisplay(d.salesperson) !== salespersonFilter) return false
     if (searchQuery && !d.patientName.toLowerCase().includes(searchQuery.toLowerCase())) return false
     
     // Time period filter
@@ -623,6 +625,22 @@ export default function Dashboard() {
             <option value="unpaid">Unpaid</option>
             <option value="flagged">Flagged</option>
           </select>
+          {!isSalesperson && (
+            <select
+              value={salespersonFilter}
+              onChange={(e) => setSalespersonFilter(e.target.value)}
+              className="border border-border rounded-lg pl-3 pr-8 py-2 bg-secondary text-foreground text-sm"
+            >
+              <option value="all">All Salespeople</option>
+              <option value="Chris">Chris</option>
+              <option value="Josh">Josh</option>
+              <option value="Molly">Molly</option>
+              <option value="Scot">Scot</option>
+              <option value="Jake">Jake</option>
+              <option value="Blake">Blake</option>
+              <option value="Unassigned">Unassigned</option>
+            </select>
+          )}
         </div>
 
         {/* Deals Table */}
