@@ -1,7 +1,7 @@
 // Pipeline Stage Configuration
 // Maps GHL stage IDs and tags to our kanban columns
 
-export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'financing', 'won', 'cold'] as const
+export const SUPER_STAGES = ['virtual', 'in_person', 'tx_plan', 'closing', 'signed', 'financing', 'won', 'cold'] as const
 export type SuperStage = typeof SUPER_STAGES[number]
 
 export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; order: number }> = {
@@ -9,9 +9,10 @@ export const STAGE_CONFIG: Record<SuperStage, { name: string; color: string; ord
   in_person: { name: 'In-Person', color: 'bg-purple-100 dark:bg-purple-900/30', order: 1 },
   tx_plan: { name: 'TX Plan', color: 'bg-amber-100 dark:bg-amber-900/30', order: 2 },
   closing: { name: 'Closing', color: 'bg-orange-100 dark:bg-orange-900/30', order: 3 },
-  financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 4 },
-  won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 5 },
-  cold: { name: 'Cold', color: 'bg-gray-100 dark:bg-gray-800/50', order: 6 },
+  signed: { name: 'Signed', color: 'bg-emerald-100 dark:bg-emerald-900/30', order: 4 },
+  financing: { name: 'Financing', color: 'bg-cyan-100 dark:bg-cyan-900/30', order: 5 },
+  won: { name: 'Won', color: 'bg-green-100 dark:bg-green-900/30', order: 6 },
+  cold: { name: 'Cold', color: 'bg-gray-100 dark:bg-gray-800/50', order: 7 },
 }
 
 // Days without significant tag changes before marking as Cold
@@ -48,8 +49,10 @@ export const TAG_TO_SUPER: Record<string, SuperStage> = {
   // Closing
   'fa-closingconsult': 'closing',
   
+  // Signed (patient has signed agreements)
+  'pt-agreement-signed': 'signed',
+  
   // Financing
-  'pt-agreement-signed': 'financing',
   'cherrydenial': 'financing',  // needs attention - financing fell through
   
   // Cold (no-shows and stalled)

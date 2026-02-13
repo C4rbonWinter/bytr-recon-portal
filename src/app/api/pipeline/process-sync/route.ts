@@ -22,8 +22,9 @@ const SUPER_TO_TARGET_STAGES: Record<SuperStage, string[]> = {
   in_person: ['Office Appt', 'In Office', 'Office Show', 'Confirmed'],
   tx_plan: ['TX Plan Ready', 'Proposal Sent', 'Agreement Sent'],
   closing: ['Closing Call', 'Negotiation'],
-  financing: ['Finance Link Sent', 'Approved', 'PP Processing', 'Cash Patient'],
-  won: ['Signed', 'Down Payment', 'Won', 'Closed'],
+  signed: ['Signed', 'Signed '],  // Patient signed agreements (tag: pt-agreement-signed)
+  financing: ['Finance Link Sent', 'Approved', 'PP Processing', 'Cash Patient', 'Down Payment'],
+  won: ['Financials Completed', 'Won', 'Closed', 'Smile Design', 'Pre Surgery', 'Surgery'],
   cold: ['Delayed Follow Up', 'Re Engage', 'Limbo', 'No Show', 'No show OC', 'No show CC', 'Virtual No Show', 'Office No Show'],
 }
 
