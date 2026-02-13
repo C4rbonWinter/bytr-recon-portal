@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     if (!tokens || tokens.length === 0) {
       return NextResponse.json({ 
         error: 'No tokens found in database. Run OAuth flow first.',
-        authUrl: '/api/ghl/authorize'
+        authUrl: '/api/oauth/authorize'
       }, { status: 400 })
     }
 

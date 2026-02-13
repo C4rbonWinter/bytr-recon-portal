@@ -804,7 +804,7 @@ function NewDealModal({ onClose, currentUser, filterName, onCreate }: { onClose:
     
     setIsSearching(true)
     try {
-      const response = await fetch(`/api/ghl/search?q=${encodeURIComponent(query)}&clinic=${formData.clinic}`)
+      const response = await fetch(`/api/oauth/search?q=${encodeURIComponent(query)}&clinic=${formData.clinic}`)
       const data = await response.json()
       setSearchResults(data.results || [])
       setShowResults(true)

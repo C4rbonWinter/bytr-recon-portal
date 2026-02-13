@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   }
   
   // The redirect URI must match what's configured in the GHL app
-  const redirectUri = 'https://recon-portal-bytr.vercel.app/api/ghl/callback'
+  const redirectUri = 'https://recon-portal-bytr.vercel.app/api/oauth/callback'
   
   const scopes = [
     'opportunities.readonly',
