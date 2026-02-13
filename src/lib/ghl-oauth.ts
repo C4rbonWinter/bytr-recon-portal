@@ -264,12 +264,19 @@ export async function updateOpportunityValue(
 export async function getLocationToken(
   companyId: string,
   locationId: string
-): Promise<{ success: boolean; accessToken?: string; error?: string }> {
+): Promise<{ success: boolean; accessToken?: string; error?: string; needsReauth?: boolean; companyKey?: string }> {
   try {
     const accessToken = await getLocationAccessToken(locationId);
     return { success: true, accessToken };
   } catch (error) {
-    return { success: false, error: String(error) };
+    const errorStr = String(error);
+    // Detect 401/scope errors that require re-auth
+    const needsReauth = errorStr.includes('401') || 
+                        errorStr.includes('not authorized') ||
+                        errorStr.includes('unauthorized') ||
+                        errorStr.includes('invalid_grant');
+    const companyKey = LOCATION_TO_COMPANY[locationId];
+    return { success: false, error: errorStr, needsReauth, companyKey };
   }
 }
 

@@ -76,7 +76,7 @@ async function processDealTypeChange(move: { id: string; opportunityId: string; 
   }
 }
 
-async function processMove(move: { id: string; opportunityId: string; clinic: string; fromStage: string; toStage: string; attempts: number }): Promise<{ success: boolean; error?: string }> {
+async function processMove(move: { id: string; opportunityId: string; clinic: string; fromStage: string; toStage: string; attempts: number }): Promise<{ success: boolean; error?: string; needsReauth?: boolean; companyKey?: string }> {
   // Handle deal type changes separately
   if (move.fromStage === 'deal_type_change') {
     return processDealTypeChange(move)
@@ -90,7 +90,12 @@ async function processMove(move: { id: string; opportunityId: string; clinic: st
   // Get OAuth token (auto-persists new refresh tokens)
   const tokenResult = await getLocationToken('', clinicConfig.locationId)
   if (!tokenResult.success || !tokenResult.accessToken) {
-    return { success: false, error: tokenResult.error || 'Failed to get GHL token' }
+    return { 
+      success: false, 
+      error: tokenResult.error || 'Failed to get GHL token',
+      needsReauth: tokenResult.needsReauth,
+      companyKey: tokenResult.companyKey,
+    }
   }
   const accessToken = tokenResult.accessToken
 
@@ -201,6 +206,7 @@ export async function POST(request: NextRequest) {
 
     let processed = 0
     let failed = 0
+    const companiesNeedingReauth = new Set<string>()
 
     for (const move of pendingMoves) {
       const result = await processMove(move)
@@ -211,6 +217,10 @@ export async function POST(request: NextRequest) {
       } else {
         await markFailed(move.id, result.error || 'Unknown error', move.attempts + 1)
         failed++
+        // Track companies that need re-auth
+        if (result.needsReauth && result.companyKey) {
+          companiesNeedingReauth.add(result.companyKey)
+        }
       }
     }
 
@@ -219,6 +229,7 @@ export async function POST(request: NextRequest) {
       processed, 
       failed,
       remaining: pendingMoves.length - processed,
+      needsReauth: companiesNeedingReauth.size > 0 ? Array.from(companiesNeedingReauth) : undefined,
     })
   } catch (error) {
     console.error('Process sync error:', error)
