@@ -339,6 +339,8 @@ export function PipelineKanban({ salespersonIds, salespersonName, isAdmin = true
   useEffect(() => {
     if (salespersonIds && salespersonIds.length > 0) {
       setSalespersonFilter(salespersonIds.join(','))
+    } else {
+      setSalespersonFilter('') // Clear filter when switching back to admin view
     }
   }, [salespersonIds])
   
