@@ -28,8 +28,11 @@ export async function GET(request: NextRequest) {
     const redirectUri = 'https://sales.teethandrobots.com/api/oauth/callback'
     const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: 'authorization_code',
