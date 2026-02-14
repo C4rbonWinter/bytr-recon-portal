@@ -63,7 +63,8 @@ function getClientCredentials() {
 }
 
 // Get refresh token from Supabase (with fallback to env vars for initial setup)
-// Also checks if token needs re-auth
+// Note: We ALWAYS try to use the refresh token if available, even if needs_reauth is true.
+// This allows recovery after re-auth without manual DB clearing.
 async function getRefreshToken(companyKey: string): Promise<{ token: string | null; needsReauth: boolean }> {
   try {
     const supabase = getSupabase();
@@ -73,13 +74,19 @@ async function getRefreshToken(companyKey: string): Promise<{ token: string | nu
       .eq('id', companyKey)
       .single();
     
-    if (data?.needs_reauth) {
-      console.log(`Token for ${companyKey} marked as needs_reauth - skipping`);
-      return { token: null, needsReauth: true };
+    // If we have a refresh token, try to use it even if needs_reauth was previously set.
+    // A successful refresh will clear the needs_reauth flag via saveTokens().
+    if (data?.refresh_token) {
+      if (data.needs_reauth) {
+        console.log(`Token for ${companyKey} marked as needs_reauth, but will try refresh anyway`);
+      }
+      return { token: data.refresh_token, needsReauth: false };
     }
     
-    if (data?.refresh_token) {
-      return { token: data.refresh_token, needsReauth: false };
+    // No refresh token in DB - check if needs_reauth is set
+    if (data?.needs_reauth) {
+      console.log(`Token for ${companyKey} marked as needs_reauth with no refresh token`);
+      return { token: null, needsReauth: true };
     }
   } catch (err) {
     console.log(`Token lookup failed for ${companyKey}, trying env var fallback`);
@@ -147,9 +154,13 @@ async function saveTokens(
         access_token: accessToken,
         access_token_expires_at: expiresAt,
         updated_at: new Date().toISOString(),
+        // IMPORTANT: Clear needs_reauth since refresh succeeded
+        needs_reauth: false,
+        needs_reauth_at: null,
+        last_error: null,
       });
     
-    console.log(`✓ Saved new tokens for ${companyKey}`);
+    console.log(`✓ Saved new tokens for ${companyKey} (cleared needs_reauth)`);
   } catch (err) {
     console.error(`Failed to save tokens for ${companyKey}:`, err);
     // Don't throw - we can still use the token even if save fails
