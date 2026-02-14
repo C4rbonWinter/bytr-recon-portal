@@ -27,7 +27,7 @@ export async function GET() {
       ok: needsReauth.length === 0,
       needsReauth,
       status,
-      reauthUrl: 'https://recon-portal-bytr.vercel.app/api/oauth/authorize',
+      reauthUrl: 'https://sales.teethandrobots.com/api/oauth/authorize',
     })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
