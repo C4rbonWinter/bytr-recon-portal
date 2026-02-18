@@ -59,10 +59,10 @@ export interface Payment {
   method: string
   payment_date: string
   verified: boolean
-  verified_by: string
-  verified_at: string
+  verified_by: string | null
+  verified_at: string | null
   source: string
-  external_ref: string
+  external_ref: string | null
   created_at: string
   updated_at: string
 }
@@ -106,6 +106,18 @@ export async function findDeal(patientName: string, clinic: string): Promise<Dea
     .single()
 
   if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
+  return data
+}
+
+// Get a single deal by ID
+export async function getDeal(id: string): Promise<Deal | null> {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error
   return data
 }
 

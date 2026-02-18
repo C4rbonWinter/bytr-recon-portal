@@ -8,6 +8,20 @@ const ALLOWED_DOMAINS = ['teethandrobots.com', 'bytr.ai']
 // Admin emails for role assignment
 const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
 
+// Display name mapping for activity log
+const USER_NAMES: Record<string, string> = {
+  'cole@bytr.ai': 'Cole Summers',
+  'cole@teethandrobots.com': 'Cole Summers',
+  'rick@bytr.ai': 'Rick',
+  'josh@bytr.ai': 'Josh',
+  'chris@teethandrobots.com': 'Chris Traina',
+  'ctraina@teethandrobots.com': 'Chris Traina',
+}
+
+function getDisplayName(email: string): string {
+  return USER_NAMES[email.toLowerCase()] || email.split('@')[0].replace(/^\w/, c => c.toUpperCase())
+}
+
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -19,12 +33,11 @@ const handler = NextAuth({
     async signIn({ user }) {
       // Log login activity
       const email = user.email || ''
-      const name = user.name || email.split('@')[0]
       const role = ADMIN_EMAILS.includes(email) ? 'admin' : 'salesperson'
       
       logActivity({
         userId: user.id || email,
-        userName: name,
+        userName: getDisplayName(email),
         userRole: role,
         action: 'login',
         entityType: 'session',

@@ -7,6 +7,8 @@ export type ActivityAction =
   | 'deal_update'
   | 'deal_type_change'
   | 'payment_add'
+  | 'payment_added'
+  | 'payment_deleted'
   | 'payment_verify'
   | 'note_add'
   | 'export'
@@ -32,29 +34,35 @@ export function formatActivity(activity: ActivityEntry): string {
   
   switch (activity.action) {
     case 'login':
-      return `${name} logged in`
+      return `${name}: Logged in`
     case 'logout':
-      return `${name} logged out`
+      return `${name}: Logged out`
     case 'deal_move':
       const from = activity.details.from_stage as string || '?'
       const to = activity.details.to_stage as string || '?'
-      return `${name} moved ${entity} from ${from} to ${to}`
+      return `${name}: Moved ${entity} from ${from} to ${to}`
     case 'deal_update':
-      return `${name} updated ${entity}`
+      return `${name}: Updated ${entity}`
     case 'deal_type_change':
       const newType = activity.details.deal_type as string || '?'
-      return `${name} changed ${entity} to ${newType}`
+      return `${name}: Changed ${entity} to ${newType}`
     case 'payment_add':
-      const amount = activity.details.amount as number
-      return `${name} added $${amount?.toLocaleString()} payment for ${entity}`
+    case 'payment_added':
+      const addAmount = activity.details.amount as number
+      const addMethod = activity.details.method as string || ''
+      return `${name}: Added $${addAmount?.toLocaleString()} ${addMethod} payment for ${entity}`
+    case 'payment_deleted':
+      const delAmount = activity.details.amount as number
+      const delMethod = activity.details.method as string || ''
+      return `${name}: Deleted $${delAmount?.toLocaleString()} ${delMethod} payment from ${entity}`
     case 'payment_verify':
-      return `${name} verified payment for ${entity}`
+      return `${name}: Verified payment for ${entity}`
     case 'note_add':
-      return `${name} added a note to ${entity}`
+      return `${name}: Added note to ${entity}`
     case 'export':
-      return `${name} exported data`
+      return `${name}: Exported data`
     default:
-      return `${name} performed ${activity.action}`
+      return `${name}: ${(activity.action as string).replace(/_/g, ' ')}`
   }
 }
 
@@ -66,7 +74,9 @@ export function getActivityIcon(action: ActivityAction): string {
     case 'deal_move': return 'arrow-right-left'
     case 'deal_update': return 'pencil'
     case 'deal_type_change': return 'tag'
-    case 'payment_add': return 'dollar-sign'
+    case 'payment_add':
+    case 'payment_added': return 'plus-circle'
+    case 'payment_deleted': return 'minus-circle'
     case 'payment_verify': return 'check-circle'
     case 'note_add': return 'message-square'
     case 'export': return 'download'

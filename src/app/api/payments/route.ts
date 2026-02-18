@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { getPayments, createPayment, deletePayment, verifyPayment } from '@/lib/supabase'
+import { getPayments, createPayment, deletePayment, verifyPayment, getDeal } from '@/lib/supabase'
+import { logActivity } from '@/lib/activity-log'
 
 // Admins can auto-verify cash payments
 const ADMIN_EMAILS = ['cole@bytr.ai', 'rick@bytr.ai', 'cole@teethandrobots.com', 'josh@bytr.ai', 'chris@teethandrobots.com']
 const ALLOWED_DOMAINS = ['@teethandrobots.com', '@bytr.ai']
+
+// Display name mapping for activity log
+const USER_NAMES: Record<string, string> = {
+  'cole@bytr.ai': 'Cole Summers',
+  'cole@teethandrobots.com': 'Cole Summers',
+  'rick@bytr.ai': 'Rick',
+  'josh@bytr.ai': 'Josh',
+  'chris@teethandrobots.com': 'Chris Traina',
+  'ctraina@teethandrobots.com': 'Chris Traina',
+}
+
+function getDisplayName(email: string): string {
+  return USER_NAMES[email.toLowerCase()] || email.split('@')[0].replace(/^\w/, c => c.toUpperCase())
+}
 
 async function requireAuth(): Promise<{ authorized: boolean; email?: string }> {
   const session = await getServerSession()
@@ -51,24 +66,46 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    const isCash = body.method === 'Cash'
     const userEmail = body.userEmail || ''
-    const isAdmin = ADMIN_EMAILS.includes(userEmail)
+    const source = body.source || 'manual'
     
-    // Cash needs verification UNLESS added by an admin
-    const needsVerification = isCash && !isAdmin
+    // Manual payments start UNVERIFIED (editable)
+    // Only system/API payments (from ReconBot) start verified
+    const isSystemSource = source === 'system' || source === 'api' || source === 'sync'
     
     const payment = await createPayment({
       deal_id: body.dealId,
       amount: parseFloat(body.amount) || 0,
       method: body.method,
       payment_date: body.paymentDate || new Date().toISOString().split('T')[0],
-      verified: !needsVerification,
-      verified_by: needsVerification ? '' : (isAdmin ? userEmail : 'system'),
-      verified_at: needsVerification ? '' : new Date().toISOString(),
-      source: body.source || 'manual',
-      external_ref: body.externalRef || '',
+      verified: isSystemSource,
+      verified_by: isSystemSource ? 'system' : null,
+      verified_at: isSystemSource ? new Date().toISOString() : null,
+      source: source,
+      external_ref: body.externalRef || null,
     })
+    
+    // Log activity (non-blocking)
+    try {
+      const deal = await getDeal(body.dealId)
+      logActivity({
+        userId: auth.email || 'unknown',
+        userName: getDisplayName(auth.email || ''),
+        userRole: ADMIN_EMAILS.includes(auth.email || '') ? 'admin' : 'user',
+        action: 'payment_added',
+        entityType: 'payment',
+        entityId: payment.id,
+        entityName: deal?.patient_name || 'Unknown',
+        details: {
+          amount: payment.amount,
+          method: payment.method,
+          dealId: body.dealId,
+        },
+        clinic: deal?.clinic,
+      }).catch(err => console.error('Activity log error:', err))
+    } catch (logErr) {
+      console.error('Activity logging failed:', logErr)
+    }
     
     return NextResponse.json({ payment })
   } catch (error) {
@@ -121,6 +158,22 @@ export async function DELETE(request: NextRequest) {
     }
     
     await deletePayment(id)
+    
+    // Log activity (non-blocking, best effort)
+    try {
+      logActivity({
+        userId: auth.email || 'unknown',
+        userName: getDisplayName(auth.email || ''),
+        userRole: ADMIN_EMAILS.includes(auth.email || '') ? 'admin' : 'user',
+        action: 'payment_deleted',
+        entityType: 'payment',
+        entityId: id,
+        entityName: 'Payment',
+        details: { paymentId: id },
+      }).catch(err => console.error('Activity log error:', err))
+    } catch (logErr) {
+      console.error('Activity logging failed:', logErr)
+    }
     
     return NextResponse.json({ success: true })
   } catch (error) {

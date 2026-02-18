@@ -4,6 +4,20 @@ import { getSupabase } from '@/lib/supabase'
 import { logActivity } from '@/lib/activity-log'
 import { cookies } from 'next/headers'
 
+// Display name mapping for activity log
+const USER_NAMES: Record<string, string> = {
+  'cole@bytr.ai': 'Cole Summers',
+  'cole@teethandrobots.com': 'Cole Summers',
+  'rick@bytr.ai': 'Rick',
+  'josh@bytr.ai': 'Josh',
+  'chris@teethandrobots.com': 'Chris Traina',
+  'ctraina@teethandrobots.com': 'Chris Traina',
+}
+
+function getDisplayName(email: string): string {
+  return USER_NAMES[email.toLowerCase()] || email.split('@')[0].replace(/^\w/, c => c.toUpperCase())
+}
+
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
@@ -50,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (session) {
       logActivity({
         userId: session.id,
-        userName: session.name,
+        userName: getDisplayName(session.id),
         userRole: session.role,
         action: 'deal_move',
         entityType: 'deal',

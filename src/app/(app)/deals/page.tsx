@@ -295,13 +295,26 @@ export default function Dashboard() {
       })
       
       if (response.ok) {
-        // Refresh deals to get updated totals
-        await fetchDeals()
-        // Update selectedDeal
+        const data = await response.json()
+        const newPayment: Payment = {
+          id: data.payment.id,
+          amount: data.payment.amount,
+          method: data.payment.method,
+          date: data.payment.payment_date,
+          verified: data.payment.verified || false,
+        }
+        
+        // Update allDeals with new payment
+        setAllDeals(prev => prev.map(deal => 
+          deal.id === dealId 
+            ? { ...deal, payments: [...deal.payments, newPayment] }
+            : deal
+        ))
+        
+        // Update selectedDeal immediately
         setSelectedDeal(prev => {
           if (!prev || prev.id !== dealId) return prev
-          const updated = allDeals.find(d => d.id === dealId)
-          return updated || prev
+          return { ...prev, payments: [...prev.payments, newPayment] }
         })
       }
     } catch (error) {
@@ -1242,7 +1255,7 @@ function DealDetailModal({
                           Verify
                         </button>
                       )}
-                      {!isSalesperson && !payment.verified && (
+                      {!payment.verified && (
                         <button
                           onClick={() => onDeletePayment(payment.id)}
                           className="text-red-400 hover:text-red-600 ml-2"
