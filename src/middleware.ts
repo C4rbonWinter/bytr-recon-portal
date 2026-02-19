@@ -13,9 +13,11 @@ export default withAuth({
 // - /api/pipeline/process-sync (called by cron - secured by CRON_SECRET)
 // - /api/ghl/* (OAuth flow + token status)
 // - /api/oauth/* (OAuth callbacks)
+// - /api/autobot/* (Autobot OAuth + webhooks)
+// - /autobot (Autobot landing page)
 // - Static assets
 export const config = {
   matcher: [
-    '/((?!login|api/auth|api/cron|api/pipeline/process-sync|api/ghl|api/oauth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!login|api/auth|api/cron|api/pipeline/process-sync|api/ghl|api/oauth|api/autobot|autobot|_next/static|_next/image|favicon.ico).*)',
   ],
 }
