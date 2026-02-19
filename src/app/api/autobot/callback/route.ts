@@ -13,9 +13,19 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const error = searchParams.get('error');
 
+  // Debug: check env vars
+  const clientId = process.env.AUTOBOT_CLIENT_ID;
+  const clientSecret = process.env.AUTOBOT_CLIENT_SECRET;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  
+  if (!clientId || !clientSecret || !appUrl) {
+    console.error('Missing env vars:', { clientId: !!clientId, clientSecret: !!clientSecret, appUrl: !!appUrl });
+    return NextResponse.redirect(new URL('/autobot?error=missing_env_vars', request.url));
+  }
+
   if (error) {
-    console.error('OAuth error:', error);
-    return NextResponse.redirect(new URL(`/autobot?error=${error}`, request.url));
+    console.error('OAuth error from GHL:', error);
+    return NextResponse.redirect(new URL(`/autobot?error=ghl_${error}`, request.url));
   }
 
   if (!code) {
@@ -23,6 +33,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const redirectUri = `${appUrl}/api/autobot/callback`;
+    
     // Exchange code for tokens
     const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
       method: 'POST',
@@ -30,11 +42,11 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: process.env.AUTOBOT_CLIENT_ID!,
-        client_secret: process.env.AUTOBOT_CLIENT_SECRET!,
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/autobot/callback`,
+        redirect_uri: redirectUri,
       }),
     });
 
@@ -42,7 +54,12 @@ export async function GET(request: NextRequest) {
 
     if (tokens.error) {
       console.error('Token exchange error:', tokens);
-      return NextResponse.redirect(new URL(`/autobot?error=${tokens.error}`, request.url));
+      return NextResponse.redirect(new URL(`/autobot?error=token_${tokens.error}&desc=${encodeURIComponent(tokens.error_description || '')}`, request.url));
+    }
+    
+    if (!tokens.access_token) {
+      console.error('No access token in response:', tokens);
+      return NextResponse.redirect(new URL('/autobot?error=no_access_token', request.url));
     }
 
     // Decode the access token to get location/company info
