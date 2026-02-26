@@ -32,7 +32,7 @@ interface CompanyConfig {
 const COMPANY_CONFIGS: Record<string, CompanyConfig> = {
   vegas: {
     companyId: 'wX6xVVyBQwLwMugrEdvR',
-    locations: ['1isaYfEkvNkyLH3XepI5'], // TR04 Las Vegas
+    locations: ['1isaYfEkvNkyLH3XepI5', 'GItsCUrnAZaalGC0I1on'], // TR04 Las Vegas, TR03 Arcadia
   },
   salesjet: {
     companyId: 'VVkTNsveI02sHUrJ0gOM',
@@ -43,6 +43,7 @@ const COMPANY_CONFIGS: Record<string, CompanyConfig> = {
 // Location to company mapping
 const LOCATION_TO_COMPANY: Record<string, keyof typeof COMPANY_CONFIGS> = {
   '1isaYfEkvNkyLH3XepI5': 'vegas',      // TR04 Las Vegas
+  'GItsCUrnAZaalGC0I1on': 'vegas',      // TR03 Arcadia
   'cl9YH8PZgv32HEz5pIXT': 'salesjet',   // TR01 San Gabriel
   'DJfIuAH1tTxRRBEufitL': 'salesjet',   // TR02 Irvine
 };

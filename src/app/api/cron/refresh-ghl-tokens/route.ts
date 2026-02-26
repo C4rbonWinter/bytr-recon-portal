@@ -11,6 +11,12 @@ const LOCATIONS = {
     locationId: '1isaYfEkvNkyLH3XepI5',
     envVar: 'GHL_TOKEN_VEGAS',
   },
+  arcadia: {
+    companyId: 'wX6xVVyBQwLwMugrEdvR',
+    locationId: 'GItsCUrnAZaalGC0I1on',
+    envVar: 'GHL_TOKEN_ARCADIA',
+    companyKey: 'vegas',
+  },
   sg: {
     companyId: 'VVkTNsveI02sHUrJ0gOM',
     locationId: 'cl9YH8PZgv32HEz5pIXT',
@@ -164,6 +170,25 @@ export async function GET(request: NextRequest) {
           results['vegas'] = '✅ refreshed'
         } else {
           results['vegas'] = '⚠️ company refreshed but location token failed'
+        }
+
+        // Get Arcadia location token (TR03 - same company as Vegas)
+        const arcadiaLocToken = await getLocationToken(
+          newTokens.access_token,
+          LOCATIONS.arcadia.companyId,
+          LOCATIONS.arcadia.locationId
+        )
+
+        if (arcadiaLocToken) {
+          await supabase.from('ghl_location_tokens').upsert({
+            id: 'TR03',
+            location_id: LOCATIONS.arcadia.locationId,
+            access_token: arcadiaLocToken,
+            updated_at: new Date().toISOString(),
+          })
+          results['arcadia'] = '✅ refreshed'
+        } else {
+          results['arcadia'] = '⚠️ company refreshed but location token failed'
         }
       } else {
         results['vegas'] = '❌ refresh failed - need re-auth'
