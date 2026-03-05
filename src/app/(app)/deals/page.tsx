@@ -56,7 +56,7 @@ function getSalespersonDisplay(value: string | null): string {
 interface Payment {
   id: string
   amount: number
-  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'Patient Preferred' | 'Check' | 'Alphaeon' | 'Sunbit' | 'HFD' | 'LendingClub' | 'Insurance' | 'ACH/Wire'
+  method: 'Cash' | 'Credit Card' | 'Cherry' | 'CareCredit' | 'Proceed' | 'Patient Preferred' | 'Check' | 'Alphaeon' | 'Sunbit' | 'HFD' | 'LendingClub' | 'Insurance' | 'ACH/Wire' | 'ACH External'
   date: string
   verified: boolean
 }
@@ -222,6 +222,7 @@ const MethodIcon = ({ method }: { method: string }) => {
     case 'LendingClub': return <Landmark className={`${iconClass} text-indigo-400`} />
     case 'Insurance': return <Shield className={`${iconClass} text-chart-3`} />
     case 'ACH/Wire': return <Zap className={`${iconClass} text-chart-1`} />
+    case 'ACH External': return <Building2 className={`${iconClass} text-orange-400`} />
     default: return null
   }
 }
@@ -468,7 +469,7 @@ export default function Dashboard() {
   // Unverified cash payments for notifications
   const unverifiedPayments = allDeals.flatMap(deal => 
     deal.payments
-      .filter(p => p.method === 'Cash' && !p.verified)
+      .filter(p => (p.method === 'Cash' || p.method === 'ACH External') && !p.verified)
       .map(p => ({
         paymentId: p.id,
         dealId: deal.id,
@@ -1316,14 +1317,14 @@ function DealDetailModal({
                         <MethodIcon method={payment.method} />
                         {payment.method}
                       </span>
-                      {payment.method === 'Cash' && !payment.verified && (
-                        <span className="ml-2 text-xs bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded">Pending Verification</span>
+                      {(payment.method === 'Cash' || payment.method === 'ACH External') && !payment.verified && (
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded ${payment.method === 'ACH External' ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400' : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400'}`}>Pending Verification</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
                       {payment.date}
                       {payment.verified && <Check className="h-4 w-4 text-success" />}
-                      {!isSalesperson && payment.method === 'Cash' && !payment.verified && (
+                      {!isSalesperson && (payment.method === 'Cash' || payment.method === 'ACH External') && !payment.verified && (
                         <button
                           onClick={() => onVerifyPayment(payment.id)}
                           className="text-xs bg-success/10 text-success px-2 py-1 rounded hover:bg-success/20 transition-colors font-medium"
@@ -1402,6 +1403,7 @@ function DealDetailModal({
                     <option value="Cash">Cash</option>
                     <option value="Check">Check</option>
                     <option value="ACH/Wire">ACH/Wire</option>
+                    <option value="ACH External">ACH External (Dr. Account)</option>
                   </optgroup>
                   <optgroup label="Other">
                     <option value="Insurance">Insurance</option>
@@ -1411,6 +1413,11 @@ function DealDetailModal({
               {paymentForm.method === 'Cash' && (
                 <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/50 p-2 rounded flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" /> Cash payments require admin verification
+                </p>
+              )}
+              {paymentForm.method === 'ACH External' && (
+                <p className="text-xs text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50 p-2 rounded flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> ACH External goes to Dr. account — requires their confirmation to verify
                 </p>
               )}
               <div className="flex gap-2">
