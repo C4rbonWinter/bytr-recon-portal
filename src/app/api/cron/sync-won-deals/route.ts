@@ -37,10 +37,9 @@ const CLINIC_CONFIG = {
   },
 }
 
-// Won stage names (case-insensitive matching)
-const WON_STAGE_NAMES = new Set([
-  'signed', 'signed ', 'down payment', 'down payment ', 'won', 'closed', 'sold'
-])
+// "Signed" is the trigger stage - anything at or after "Signed" is a deal
+// Deals persist forever (historical tracking)
+const SIGNED_STAGE_NAMES = ['signed', 'signed '] // Stage names that mark "deal starts here"
 
 // Google Service Account
 function getServiceAccountCredentials() {
@@ -219,10 +218,30 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
     
     const stagesData = await stagesRes.json()
     const stageIdToName: Record<string, string> = {}
+    const stageIdToOrder: Record<string, number> = {}
+    let signedStageOrder = -1
+    
+    // Build stage map and find "Signed" position
     for (const pipeline of stagesData.pipelines || []) {
-      for (const stage of pipeline.stages || []) {
-        stageIdToName[stage.id] = stage.name.toLowerCase().trim()
+      if (pipeline.id === config.salesPipelineId) {
+        const stages = pipeline.stages || []
+        for (let i = 0; i < stages.length; i++) {
+          const stage = stages[i]
+          const stageName = stage.name.toLowerCase().trim()
+          stageIdToName[stage.id] = stageName
+          stageIdToOrder[stage.id] = i
+          
+          // Find "Signed" stage position
+          if (SIGNED_STAGE_NAMES.includes(stageName) && signedStageOrder === -1) {
+            signedStageOrder = i
+          }
+        }
       }
+    }
+    
+    if (signedStageOrder === -1) {
+      result.errors.push('Could not find "Signed" stage in pipeline')
+      return result
     }
     
     // Fetch opportunities from sales pipeline
@@ -246,9 +265,10 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
     
     for (const opp of opportunities) {
       const stageName = stageIdToName[opp.pipelineStageId] || ''
+      const stageOrder = stageIdToOrder[opp.pipelineStageId] ?? -1
       
-      // Only process Won stages
-      if (!WON_STAGE_NAMES.has(stageName)) continue
+      // Only process opportunities at or past "Signed" stage
+      if (stageOrder < signedStageOrder) continue
       
       // Skip test records
       if (opp.name?.toLowerCase().includes('test')) continue
@@ -258,7 +278,7 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       // Check if deal exists in Supabase
       const { data: existingDeal } = await supabase
         .from('deals')
-        .select('id')
+        .select('id, ghl_stage')
         .eq('patient_name', opp.name)
         .eq('clinic', clinic)
         .limit(1)
@@ -266,6 +286,13 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       
       if (existingDeal) {
         result.existingDeals++
+        // Update stage if changed (deals persist forever, just track current stage)
+        if (existingDeal.ghl_stage !== stageName) {
+          await supabase
+            .from('deals')
+            .update({ ghl_stage: stageName, updated_at: new Date().toISOString() })
+            .eq('id', existingDeal.id)
+        }
         continue
       }
       
@@ -288,10 +315,11 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
           deal_type: 'full_arch', // default
           plan_total: planTotal,
           invoice_link: '',
-          notes: `Auto-created from GHL Won opportunity`,
+          notes: `Auto-created from GHL opportunity`,
           deal_month: new Date().toISOString().slice(0, 7), // YYYY-MM
           status: 'unpaid',
           ghl_contact_id: opp.contact?.id || opp.contactId || '',
+          ghl_stage: stageName, // Track current GHL stage
         })
       
       if (insertError) {

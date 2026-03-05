@@ -1,30 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT, importPKCS8 } from 'jose'
+import { getLocationToken } from '@/lib/ghl-oauth'
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET
 
-// GHL API tokens (read-only, from Private Integrations)
-const GHL_TOKENS: Record<string, string> = {
-  TR01: process.env.GHL_TOKEN_SG || '',
-  TR02: process.env.GHL_TOKEN_IRV || '',
-  TR04: process.env.GHL_TOKEN_VEGAS || '',
-}
-
-// Clinic configs
+// Clinic configs with OAuth company mapping
 const CLINIC_CONFIG = {
   TR01: { 
     locationId: 'cl9YH8PZgv32HEz5pIXT',
+    companyId: 'VVkTNsveI02sHUrJ0gOM', // SalesJet
     salesPipelineId: 'PI6UfhZ4zXZn9WsZMPtX',
   },
   TR02: { 
     locationId: 'DJfIuAH1tTxRRBEufitL',
+    companyId: 'VVkTNsveI02sHUrJ0gOM', // SalesJet
     salesPipelineId: '90QnJLnT6TeD8EXF0er5',
   },
   TR04: { 
     locationId: '1isaYfEkvNkyLH3XepI5',
+    companyId: 'wX6xVVyBQwLwMugrEdvR', // Vegas/BYTR
     salesPipelineId: 'pMZ709aQj5aN3OgeQebh',
   },
+}
+
+// Get GHL token for a clinic via OAuth (auto-refreshing)
+async function getGhlToken(clinic: keyof typeof CLINIC_CONFIG): Promise<string | null> {
+  const config = CLINIC_CONFIG[clinic]
+  const result = await getLocationToken(config.companyId, config.locationId)
+  if (result.success && result.accessToken) {
+    return result.accessToken
+  }
+  console.error(`Failed to get OAuth token for ${clinic}:`, result.error)
+  return null
 }
 
 // Target stages (lowercase for matching)
@@ -151,6 +159,13 @@ interface SyncResult {
   updated: number
   errors: string[]
   suggestions?: Suggestion[]
+  debug?: {
+    totalFetched: number
+    skippedWrongStage: number
+    skippedHasValue: number
+    skippedTest: number
+    stageMap: Record<string, string>
+  }
 }
 
 // Extract spreadsheet ID from Google Sheets URL
@@ -258,7 +273,7 @@ async function getContactInvoiceLink(
   clinic: keyof typeof CLINIC_CONFIG,
   contactId: string
 ): Promise<string | null> {
-  const token = GHL_TOKENS[clinic]
+  const token = await getGhlToken(clinic)
   if (!token || !contactId) return null
   
   try {
@@ -296,9 +311,9 @@ async function updateOpportunityValue(
   opportunityId: string,
   value: number
 ): Promise<boolean> {
-  const token = GHL_TOKENS[clinic]
+  const token = await getGhlToken(clinic)
   if (!token) {
-    console.error(`No token for clinic ${clinic}`)
+    console.error(`No OAuth token for clinic ${clinic}`)
     return false
   }
   
@@ -337,11 +352,11 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG, dryRun: boolean = 
     errors: [],
   }
   
-  const token = GHL_TOKENS[clinic]
   const config = CLINIC_CONFIG[clinic]
+  const token = await getGhlToken(clinic)
   
   if (!token) {
-    result.errors.push('No GHL token')
+    result.errors.push('No OAuth token - may need re-auth')
     return result
   }
   
@@ -391,17 +406,31 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG, dryRun: boolean = 
     // Apply limit
     const opportunities = allOpportunities.slice(0, maxOpps)
     
+    // Debug: track filtering
+    let skippedWrongStage = 0
+    let skippedHasValue = 0
+    let skippedTest = 0
+    
     for (const opp of opportunities) {
       const stageName = stageIdToName[opp.pipelineStageId] || ''
       
       // Only process target stages
-      if (!TARGET_STAGES.has(stageName)) continue
+      if (!TARGET_STAGES.has(stageName)) {
+        skippedWrongStage++
+        continue
+      }
       
       // Skip if already has a value
-      if (opp.monetaryValue && opp.monetaryValue > 0) continue
+      if (opp.monetaryValue && opp.monetaryValue > 0) {
+        skippedHasValue++
+        continue
+      }
       
       // Skip test records
-      if (opp.name?.toLowerCase().includes('test')) continue
+      if (opp.name?.toLowerCase().includes('test')) {
+        skippedTest++
+        continue
+      }
       
       result.processed++
       
@@ -439,6 +468,15 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG, dryRun: boolean = 
           }
         }
       }
+    }
+    
+    // Add debug stats
+    result.debug = {
+      totalFetched: opportunities.length,
+      skippedWrongStage,
+      skippedHasValue,
+      skippedTest,
+      stageMap: Object.fromEntries(Object.entries(stageIdToName).slice(0, 15)),
     }
     
     return result
