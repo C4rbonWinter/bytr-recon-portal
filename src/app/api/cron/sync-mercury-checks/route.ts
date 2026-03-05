@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase(): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Mercury API config
 const MERCURY_ACCOUNTS = [
@@ -128,7 +130,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all deals for matching
-    const { data: deals, error: dealsError } = await supabase
+    const { data: deals, error: dealsError } = await getSupabase()
       .from('deals')
       .select('id, patient_name, clinic')
     
@@ -138,7 +140,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get existing Mercury payments to avoid duplicates
-    const { data: existingPayments } = await supabase
+    const { data: existingPayments } = await getSupabase()
       .from('payments')
       .select('external_ref')
       .like('source', 'Mercury%')
@@ -176,7 +178,7 @@ export async function GET(request: NextRequest) {
             // High confidence match - auto-apply
             const paymentDate = tx.postedAt.split('T')[0]
             
-            const { error: insertError } = await supabase
+            const { error: insertError } = await getSupabase()
               .from('payments')
               .insert({
                 deal_id: bestMatch.deal.id,
