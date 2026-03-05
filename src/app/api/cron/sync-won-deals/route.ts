@@ -244,24 +244,46 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       return result
     }
     
-    // Fetch opportunities from sales pipeline
-    const oppsRes = await fetch(
-      `https://services.leadconnectorhq.com/opportunities/search?location_id=${config.locationId}&status=open&limit=100&pipeline_id=${config.salesPipelineId}`,
-      {
+    // Fetch ALL opportunities from sales pipeline (with pagination)
+    const opportunities: any[] = []
+    let startAfter: string | null = null
+    let hasMore = true
+    
+    while (hasMore) {
+      const url = new URL('https://services.leadconnectorhq.com/opportunities/search')
+      url.searchParams.set('location_id', config.locationId)
+      url.searchParams.set('status', 'open')
+      url.searchParams.set('limit', '100')
+      url.searchParams.set('pipeline_id', config.salesPipelineId)
+      if (startAfter) {
+        url.searchParams.set('startAfter', startAfter)
+      }
+      
+      const oppsRes = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Version': '2021-07-28',
         },
+      })
+      
+      if (!oppsRes.ok) {
+        result.errors.push(`Failed to fetch opportunities: ${oppsRes.status}`)
+        return result
       }
-    )
-    
-    if (!oppsRes.ok) {
-      result.errors.push(`Failed to fetch opportunities: ${oppsRes.status}`)
-      return result
+      
+      const oppsData = await oppsRes.json()
+      const pageOpps = oppsData.opportunities || []
+      opportunities.push(...pageOpps)
+      
+      // Check for more pages
+      if (pageOpps.length < 100 || !oppsData.meta?.nextPageUrl) {
+        hasMore = false
+      } else {
+        // Get startAfter from last opportunity ID for next page
+        startAfter = pageOpps[pageOpps.length - 1]?.id
+        if (!startAfter) hasMore = false
+      }
     }
-    
-    const oppsData = await oppsRes.json()
-    const opportunities = oppsData.opportunities || []
     
     for (const opp of opportunities) {
       const stageName = stageIdToName[opp.pipelineStageId] || ''
