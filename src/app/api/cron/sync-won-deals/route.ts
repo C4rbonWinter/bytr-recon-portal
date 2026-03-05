@@ -37,9 +37,11 @@ const CLINIC_CONFIG = {
   },
 }
 
-// "Signed" is the trigger stage - anything at or after "Signed" is a deal
-// Deals persist forever (historical tracking)
-const SIGNED_STAGE_NAMES = ['signed', 'signed '] // Stage names that mark "deal starts here"
+// Tag that qualifies a contact as a deal
+const DEAL_TAG = 'txready'
+
+// Days of inactivity before dropping a deal (unless paid in full)
+const INACTIVITY_DROP_DAYS = 90
 
 // Google Service Account
 function getServiceAccountCredentials() {
@@ -174,19 +176,35 @@ async function getInvoiceValue(patientName: string): Promise<number | null> {
 
 interface SyncResult {
   clinic: string
-  wonOpportunities: number
+  txreadyContacts: number
   existingDeals: number
   newDealsCreated: number
+  skippedNoInvoice: number
   errors: string[]
   created: Array<{ name: string; planTotal: number }>
+}
+
+interface DropResult {
+  totalChecked: number
+  dropped: number
+  keptPaidInFull: number
+  keptActive: number
+  droppedNames: string[]
+}
+
+// Check if contact has txready tag
+function hasTxReadyTag(contact: any): boolean {
+  const tags = contact?.tags || []
+  return tags.some((tag: string) => tag.toLowerCase() === DEAL_TAG)
 }
 
 async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResult> {
   const result: SyncResult = {
     clinic,
-    wonOpportunities: 0,
+    txreadyContacts: 0,
     existingDeals: 0,
     newDealsCreated: 0,
+    skippedNoInvoice: 0,
     errors: [],
     created: [],
   }
@@ -200,50 +218,6 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
   }
   
   try {
-    // Fetch stages to get stage names
-    const stagesRes = await fetch(
-      `https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${config.locationId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Version': '2021-07-28',
-        },
-      }
-    )
-    
-    if (!stagesRes.ok) {
-      result.errors.push(`Failed to fetch stages: ${stagesRes.status}`)
-      return result
-    }
-    
-    const stagesData = await stagesRes.json()
-    const stageIdToName: Record<string, string> = {}
-    const stageIdToOrder: Record<string, number> = {}
-    let signedStageOrder = -1
-    
-    // Build stage map and find "Signed" position
-    for (const pipeline of stagesData.pipelines || []) {
-      if (pipeline.id === config.salesPipelineId) {
-        const stages = pipeline.stages || []
-        for (let i = 0; i < stages.length; i++) {
-          const stage = stages[i]
-          const stageName = stage.name.toLowerCase().trim()
-          stageIdToName[stage.id] = stageName
-          stageIdToOrder[stage.id] = i
-          
-          // Find "Signed" stage position
-          if (SIGNED_STAGE_NAMES.includes(stageName) && signedStageOrder === -1) {
-            signedStageOrder = i
-          }
-        }
-      }
-    }
-    
-    if (signedStageOrder === -1) {
-      result.errors.push('Could not find "Signed" stage in pipeline')
-      return result
-    }
-    
     // Fetch ALL opportunities from sales pipeline (with pagination)
     const opportunities: any[] = []
     let startAfter: string | null = null
@@ -252,7 +226,6 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
     while (hasMore) {
       const url = new URL('https://services.leadconnectorhq.com/opportunities/search')
       url.searchParams.set('location_id', config.locationId)
-      url.searchParams.set('status', 'open')
       url.searchParams.set('limit', '100')
       url.searchParams.set('pipeline_id', config.salesPipelineId)
       if (startAfter) {
@@ -279,23 +252,19 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       if (pageOpps.length < 100 || !oppsData.meta?.nextPageUrl) {
         hasMore = false
       } else {
-        // Get startAfter from last opportunity ID for next page
         startAfter = pageOpps[pageOpps.length - 1]?.id
         if (!startAfter) hasMore = false
       }
     }
     
     for (const opp of opportunities) {
-      const stageName = stageIdToName[opp.pipelineStageId] || ''
-      const stageOrder = stageIdToOrder[opp.pipelineStageId] ?? -1
-      
-      // Only process opportunities at or past "Signed" stage
-      if (stageOrder < signedStageOrder) continue
-      
       // Skip test records
       if (opp.name?.toLowerCase().includes('test')) continue
       
-      result.wonOpportunities++
+      // Check for txready tag on contact
+      if (!hasTxReadyTag(opp.contact)) continue
+      
+      result.txreadyContacts++
       
       // Check if deal exists in Supabase
       const { data: existingDeal } = await supabase
@@ -308,21 +277,15 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       
       if (existingDeal) {
         result.existingDeals++
-        // Update stage if changed (deals persist forever, just track current stage)
-        if (existingDeal.ghl_stage !== stageName) {
-          await supabase
-            .from('deals')
-            .update({ ghl_stage: stageName, updated_at: new Date().toISOString() })
-            .eq('id', existingDeal.id)
-        }
         continue
       }
       
-      // Get invoice value
-      const planTotal = await getInvoiceValue(opp.name) || opp.monetaryValue || 0
+      // Get invoice value - REQUIRED for deal creation
+      const planTotal = await getInvoiceValue(opp.name)
       
-      if (planTotal <= 0) {
-        result.errors.push(`No plan total for ${opp.name}`)
+      if (!planTotal || planTotal <= 0) {
+        result.skippedNoInvoice++
+        result.errors.push(`No invoice found for ${opp.name}`)
         continue
       }
       
@@ -337,11 +300,11 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
           deal_type: 'full_arch', // default
           plan_total: planTotal,
           invoice_link: '',
-          notes: `Auto-created from GHL opportunity`,
+          notes: `Auto-created from GHL (txready tag)`,
           deal_month: new Date().toISOString().slice(0, 7), // YYYY-MM
           status: 'unpaid',
           ghl_contact_id: opp.contact?.id || opp.contactId || '',
-          ghl_stage: stageName, // Track current GHL stage
+          ghl_stage: '', // No longer tracking GHL stage
         })
       
       if (insertError) {
@@ -360,6 +323,94 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
   }
 }
 
+// Drop deals with no payment activity for 90+ days (unless paid in full)
+async function dropInactiveDeals(): Promise<DropResult> {
+  const result: DropResult = {
+    totalChecked: 0,
+    dropped: 0,
+    keptPaidInFull: 0,
+    keptActive: 0,
+    droppedNames: [],
+  }
+  
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - INACTIVITY_DROP_DAYS)
+  const cutoffIso = cutoffDate.toISOString()
+  
+  // Get all deals
+  const { data: deals, error: dealsError } = await supabase
+    .from('deals')
+    .select('id, patient_name, clinic, plan_total, status, created_at')
+  
+  if (dealsError || !deals) {
+    console.error('Failed to fetch deals for drop check:', dealsError)
+    return result
+  }
+  
+  // Get all payments
+  const { data: payments, error: paymentsError } = await supabase
+    .from('payments')
+    .select('deal_id, payment_date, amount')
+  
+  if (paymentsError) {
+    console.error('Failed to fetch payments for drop check:', paymentsError)
+    return result
+  }
+  
+  // Group payments by deal
+  const paymentsByDeal: Record<string, typeof payments> = {}
+  for (const payment of payments || []) {
+    if (!paymentsByDeal[payment.deal_id]) {
+      paymentsByDeal[payment.deal_id] = []
+    }
+    paymentsByDeal[payment.deal_id].push(payment)
+  }
+  
+  for (const deal of deals) {
+    result.totalChecked++
+    
+    const dealPayments = paymentsByDeal[deal.id] || []
+    const totalCollected = dealPayments.reduce((sum, p) => sum + p.amount, 0)
+    
+    // Paid in full - never drop
+    if (totalCollected >= deal.plan_total) {
+      result.keptPaidInFull++
+      continue
+    }
+    
+    // Find most recent payment date (or deal creation if no payments)
+    let lastActivityDate = deal.created_at
+    for (const payment of dealPayments) {
+      if (payment.payment_date > lastActivityDate) {
+        lastActivityDate = payment.payment_date
+      }
+    }
+    
+    // Check if inactive for 90+ days
+    if (lastActivityDate < cutoffIso) {
+      // Drop the deal (soft delete - mark as archived)
+      const { error: archiveError } = await supabase
+        .from('deals')
+        .update({ 
+          status: 'archived' as any,
+          notes: `${deal.patient_name} - Auto-archived: no payment activity for ${INACTIVITY_DROP_DAYS}+ days`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', deal.id)
+      
+      if (!archiveError) {
+        result.dropped++
+        result.droppedNames.push(`${deal.patient_name} (${deal.clinic})`)
+        console.log(`✗ Dropped: ${deal.patient_name} (${deal.clinic}) - inactive since ${lastActivityDate}`)
+      }
+    } else {
+      result.keptActive++
+    }
+  }
+  
+  return result
+}
+
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization')
@@ -369,24 +420,37 @@ export async function GET(request: NextRequest) {
   
   // Optional clinic filter
   const clinicFilter = request.nextUrl.searchParams.get('clinic') as keyof typeof CLINIC_CONFIG | null
+  const skipDrop = request.nextUrl.searchParams.get('skipDrop') === 'true'
   const clinics = clinicFilter ? [clinicFilter] : ['TR01', 'TR02', 'TR04'] as const
   
-  console.log(`Starting Won deals sync... (clinics: ${clinics.join(', ')})`)
+  console.log(`Starting deal sync (txready tag)... (clinics: ${clinics.join(', ')})`)
   
   const results: SyncResult[] = []
   
   for (const clinic of clinics) {
     const result = await syncClinic(clinic as keyof typeof CLINIC_CONFIG)
     results.push(result)
-    console.log(`${clinic}: won=${result.wonOpportunities}, existing=${result.existingDeals}, created=${result.newDealsCreated}`)
+    console.log(`${clinic}: txready=${result.txreadyContacts}, existing=${result.existingDeals}, created=${result.newDealsCreated}, noInvoice=${result.skippedNoInvoice}`)
+  }
+  
+  // Run drop check (unless skipped)
+  let dropResult: DropResult | null = null
+  if (!skipDrop) {
+    console.log('Checking for inactive deals to drop...')
+    dropResult = await dropInactiveDeals()
+    console.log(`Drop check: ${dropResult.dropped} dropped, ${dropResult.keptPaidInFull} kept (paid), ${dropResult.keptActive} kept (active)`)
   }
   
   const summary = {
     timestamp: new Date().toISOString(),
-    totalWonOpportunities: results.reduce((sum, r) => sum + r.wonOpportunities, 0),
+    criteria: `txready tag + invoice amount`,
+    dropCriteria: `${INACTIVITY_DROP_DAYS}+ days no payment (unless paid in full)`,
+    totalTxreadyContacts: results.reduce((sum, r) => sum + r.txreadyContacts, 0),
     totalExistingDeals: results.reduce((sum, r) => sum + r.existingDeals, 0),
     totalNewDealsCreated: results.reduce((sum, r) => sum + r.newDealsCreated, 0),
+    totalSkippedNoInvoice: results.reduce((sum, r) => sum + r.skippedNoInvoice, 0),
     results,
+    dropResult,
   }
   
   console.log('Sync complete:', JSON.stringify(summary))

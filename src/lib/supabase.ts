@@ -46,7 +46,7 @@ export interface Deal {
   invoice_link: string
   notes: string
   deal_month: string
-  status: 'verified' | 'partial' | 'unpaid' | 'flagged'
+  status: 'verified' | 'partial' | 'unpaid' | 'flagged' | 'archived'
   ghl_contact_id: string
   created_at: string
   updated_at: string
@@ -67,8 +67,8 @@ export interface Payment {
   updated_at: string
 }
 
-// Fetch all deals with payments - excludes test records
-export async function getDeals(): Promise<(Deal & { collected: number; payments: Payment[] })[]> {
+// Fetch all deals with payments - excludes test records and archived deals
+export async function getDeals(includeArchived = false): Promise<(Deal & { collected: number; payments: Payment[] })[]> {
   const { data: deals, error: dealsError } = await supabase
     .from('deals')
     .select('*')
@@ -76,11 +76,13 @@ export async function getDeals(): Promise<(Deal & { collected: number; payments:
 
   if (dealsError) throw dealsError
 
-  // Filter out test records and specific test names
+  // Filter out test records, specific test names, and archived deals
   const excludeNames = ['test', 'josh summers', 'joshua summers', 'blake sales']
   const filteredDeals = (deals || []).filter(deal => {
     const nameLower = (deal.patient_name || '').toLowerCase()
-    return !excludeNames.some(excluded => nameLower.includes(excluded))
+    const isExcludedName = excludeNames.some(excluded => nameLower.includes(excluded))
+    const isArchived = deal.status === 'archived'
+    return !isExcludedName && (includeArchived || !isArchived)
   })
 
   const { data: payments, error: paymentsError } = await supabase
