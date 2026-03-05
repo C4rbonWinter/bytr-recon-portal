@@ -1249,7 +1249,7 @@ function DealDetailModal({
                   )}
                 </div>
               )}
-              <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total {!isSalesperson && <span className="text-blue-400">(click to edit)</span>}</div>
+              <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total</div>
             </div>
             <div className="text-center p-3 bg-success/10 rounded-lg">
               <div className="text-lg font-bold text-success">{formatCurrency(deal.collected)}</div>

@@ -231,25 +231,25 @@ async function getInvoiceValue(
   clinic?: string, 
   token?: string
 ): Promise<{ value: number | null; link: string | null }> {
-  // First, try to get invoice link from GHL custom fields
+  // First, try to get invoice link from GHL custom fields (fast path)
   if (contactId && clinic && token) {
     const ghlInvoiceLink = await getInvoiceLinkFromGHL(contactId, clinic, token)
     if (ghlInvoiceLink) {
       const spreadsheetId = extractSpreadsheetId(ghlInvoiceLink)
       if (spreadsheetId) {
         const value = await getInvoiceValueFromSpreadsheet(spreadsheetId)
-        if (value) {
-          return { value, link: ghlInvoiceLink }
-        }
+        // Return even if value is null - we found the link, just couldn't parse it
+        return { value, link: ghlInvoiceLink }
       }
     }
   }
   
-  // Fall back to searching Google Drive folder by name
+  // ONLY fall back to Drive folder search if GHL custom field was empty
+  // This is slow, so we avoid it when possible
   const spreadsheetId = await findInvoiceByName(patientName)
   if (spreadsheetId) {
     const value = await getInvoiceValueFromSpreadsheet(spreadsheetId)
-    return { value, link: spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : null }
+    return { value, link: `https://docs.google.com/spreadsheets/d/${spreadsheetId}` }
   }
   
   return { value: null, link: null }
