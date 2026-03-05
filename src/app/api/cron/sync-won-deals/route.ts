@@ -341,20 +341,23 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
     }
     
     for (const opp of opportunities) {
+      // Prefer contact.contactName over opp.name (opp.name is often incomplete)
+      const patientName = opp.contact?.contactName || opp.contact?.name || opp.name || ''
+      
       // Skip test records
-      if (opp.name?.toLowerCase().includes('test')) continue
+      if (patientName?.toLowerCase().includes('test')) continue
       
       // Check for qualifying tag on contact (txready OR pt-agreement-signed)
       if (!hasQualifyingTag(opp.contact)) continue
       
       result.txreadyContacts++
       
-      // Check if deal exists in Supabase
+      // Check if deal exists in Supabase (check both contact name and opp name)
       const { data: existingDeal } = await supabase
         .from('deals')
         .select('id, ghl_stage')
-        .eq('patient_name', opp.name)
         .eq('clinic', clinic)
+        .or(`patient_name.ilike.${patientName},patient_name.ilike.${opp.name}`)
         .limit(1)
         .single()
       
@@ -367,7 +370,7 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       // First check GHL custom fields, then fall back to Drive folder
       const contactId = opp.contact?.id || opp.contactId || ''
       const { value: planTotal, link: invoiceLink } = await getInvoiceValue(
-        opp.name, 
+        patientName, 
         contactId, 
         clinic, 
         token
@@ -375,7 +378,7 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       
       if (!planTotal || planTotal <= 0) {
         result.skippedNoInvoice++
-        result.errors.push(`No invoice found for ${opp.name}`)
+        result.errors.push(`No invoice found for ${patientName}`)
         continue
       }
       
@@ -383,7 +386,7 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       const { error: insertError } = await supabase
         .from('deals')
         .insert({
-          patient_name: opp.name,
+          patient_name: patientName,
           clinic: clinic,
           salesperson: opp.assignedTo || '',
           shared_with: null,
@@ -398,11 +401,11 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
         })
       
       if (insertError) {
-        result.errors.push(`Failed to create deal for ${opp.name}: ${insertError.message}`)
+        result.errors.push(`Failed to create deal for ${patientName}: ${insertError.message}`)
       } else {
         result.newDealsCreated++
-        result.created.push({ name: opp.name, planTotal })
-        console.log(`✓ Created deal: ${opp.name} ($${planTotal})`)
+        result.created.push({ name: patientName, planTotal })
+        console.log(`✓ Created deal: ${patientName} ($${planTotal})`)
       }
     }
     
