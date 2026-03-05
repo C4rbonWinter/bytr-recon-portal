@@ -37,8 +37,15 @@ const CLINIC_CONFIG = {
   },
 }
 
-// Tag that qualifies a contact as a deal
-const DEAL_TAG = 'txready'
+// Tags that qualify a contact as a deal (any of these)
+const DEAL_TAGS = ['txready', 'pt-agreement-signed']
+
+// Invoice Link custom field IDs per location
+const INVOICE_LINK_FIELD_IDS: Record<string, string> = {
+  TR01: 'KRfLpJEPnmT4Tsb8ov9K', // San Gabriel
+  TR02: 'IdlYaG597ASHeuoFeIuk', // Irvine (using Service field as fallback, may need update)
+  TR04: 'sYpwniH0Hw7EdoJr8J4K', // Las Vegas
+}
 
 // Days of inactivity before dropping a deal (unless paid in full)
 const INACTIVITY_DROP_DAYS = 90
@@ -166,12 +173,86 @@ async function getInvoiceValueFromSpreadsheet(spreadsheetId: string): Promise<nu
   }
 }
 
-async function getInvoiceValue(patientName: string): Promise<number | null> {
+// Extract spreadsheet ID from Google Docs/Sheets URL
+function extractSpreadsheetId(url: string): string | null {
+  if (!url) return null
+  // Match patterns like /d/SPREADSHEET_ID/ or /spreadsheets/d/SPREADSHEET_ID
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/)
+  return match ? match[1] : null
+}
+
+// Get invoice link from GHL contact custom fields
+async function getInvoiceLinkFromGHL(
+  contactId: string, 
+  clinic: string, 
+  token: string
+): Promise<string | null> {
+  if (!contactId || !token) return null
+  
+  try {
+    const res = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+        },
+      }
+    )
+    
+    if (!res.ok) return null
+    
+    const data = await res.json()
+    const customFields = data.contact?.customFields || []
+    const invoiceFieldId = INVOICE_LINK_FIELD_IDS[clinic]
+    
+    // Find the invoice link field
+    for (const field of customFields) {
+      // Check by field ID
+      if (field.id === invoiceFieldId && field.value) {
+        return field.value
+      }
+      // Also check if any field value looks like a Google Sheets link
+      if (typeof field.value === 'string' && 
+          field.value.includes('docs.google.com/spreadsheets')) {
+        return field.value
+      }
+    }
+    
+    return null
+  } catch {
+    return null
+  }
+}
+
+async function getInvoiceValue(
+  patientName: string, 
+  contactId?: string, 
+  clinic?: string, 
+  token?: string
+): Promise<{ value: number | null; link: string | null }> {
+  // First, try to get invoice link from GHL custom fields
+  if (contactId && clinic && token) {
+    const ghlInvoiceLink = await getInvoiceLinkFromGHL(contactId, clinic, token)
+    if (ghlInvoiceLink) {
+      const spreadsheetId = extractSpreadsheetId(ghlInvoiceLink)
+      if (spreadsheetId) {
+        const value = await getInvoiceValueFromSpreadsheet(spreadsheetId)
+        if (value) {
+          return { value, link: ghlInvoiceLink }
+        }
+      }
+    }
+  }
+  
+  // Fall back to searching Google Drive folder by name
   const spreadsheetId = await findInvoiceByName(patientName)
   if (spreadsheetId) {
-    return await getInvoiceValueFromSpreadsheet(spreadsheetId)
+    const value = await getInvoiceValueFromSpreadsheet(spreadsheetId)
+    return { value, link: spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}` : null }
   }
-  return null
+  
+  return { value: null, link: null }
 }
 
 interface SyncResult {
@@ -192,10 +273,12 @@ interface DropResult {
   droppedNames: string[]
 }
 
-// Check if contact has txready tag
-function hasTxReadyTag(contact: any): boolean {
+// Check if contact has any qualifying deal tag
+function hasQualifyingTag(contact: any): boolean {
   const tags = contact?.tags || []
-  return tags.some((tag: string) => tag.toLowerCase() === DEAL_TAG)
+  return tags.some((tag: string) => 
+    DEAL_TAGS.includes(tag.toLowerCase())
+  )
 }
 
 async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResult> {
@@ -261,8 +344,8 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       // Skip test records
       if (opp.name?.toLowerCase().includes('test')) continue
       
-      // Check for txready tag on contact
-      if (!hasTxReadyTag(opp.contact)) continue
+      // Check for qualifying tag on contact (txready OR pt-agreement-signed)
+      if (!hasQualifyingTag(opp.contact)) continue
       
       result.txreadyContacts++
       
@@ -281,7 +364,14 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
       }
       
       // Get invoice value - REQUIRED for deal creation
-      const planTotal = await getInvoiceValue(opp.name)
+      // First check GHL custom fields, then fall back to Drive folder
+      const contactId = opp.contact?.id || opp.contactId || ''
+      const { value: planTotal, link: invoiceLink } = await getInvoiceValue(
+        opp.name, 
+        contactId, 
+        clinic, 
+        token
+      )
       
       if (!planTotal || planTotal <= 0) {
         result.skippedNoInvoice++
@@ -299,8 +389,8 @@ async function syncClinic(clinic: keyof typeof CLINIC_CONFIG): Promise<SyncResul
           shared_with: null,
           deal_type: 'full_arch', // default
           plan_total: planTotal,
-          invoice_link: '',
-          notes: `Auto-created from GHL (txready tag)`,
+          invoice_link: invoiceLink || '',
+          notes: `Auto-created from GHL`,
           deal_month: new Date().toISOString().slice(0, 7), // YYYY-MM
           status: 'unpaid',
           ghl_contact_id: opp.contact?.id || opp.contactId || '',
