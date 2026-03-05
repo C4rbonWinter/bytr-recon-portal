@@ -431,7 +431,7 @@ export default function Dashboard() {
     }
   }
 
-  const handleUpdateDeal = async (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string }) => {
+  const handleUpdateDeal = async (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string; planTotal?: number }) => {
     try {
       const response = await fetch('/api/deals', {
         method: 'PATCH',
@@ -448,6 +448,7 @@ export default function Dashboard() {
             ...(updates.sharedWith !== undefined && { sharedWith: updates.sharedWith }),
             ...(updates.salesperson !== undefined && { salesperson: updates.salesperson || null }),
             ...(updates.notes !== undefined && { notes: updates.notes }),
+            ...(updates.planTotal !== undefined && { planTotal: updates.planTotal }),
           }
         })
       } else {
@@ -1129,13 +1130,15 @@ function DealDetailModal({
   onAddPayment: (payment: Omit<Payment, 'id' | 'verified'>) => void
   onDeletePayment: (paymentId: string) => void
   onVerifyPayment: (paymentId: string) => void
-  onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string }) => Promise<void>
+  onUpdateDeal: (id: string, updates: { sharedWith?: string | null; salesperson?: string; notes?: string; planTotal?: number }) => Promise<void>
   isSalesperson: boolean
 }) {
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [sharedWith, setSharedWith] = useState(deal.sharedWith || '')
   const [salesperson, setSalesperson] = useState(deal.salesperson)
   const [notes, setNotes] = useState(deal.notes || '')
+  const [planTotal, setPlanTotal] = useState(deal.planTotal.toString())
+  const [editingPlanTotal, setEditingPlanTotal] = useState(false)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     method: '' as Payment['method'] | '',
@@ -1143,7 +1146,8 @@ function DealDetailModal({
   })
 
   // Track if there are unsaved changes
-  const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '') || notes !== (deal.notes || '')
+  const planTotalNum = parseFloat(planTotal) || 0
+  const hasChanges = sharedWith !== (deal.sharedWith || '') || (salesperson || '') !== (deal.salesperson || '') || notes !== (deal.notes || '') || planTotalNum !== deal.planTotal
 
   // Close on Escape key
   useEffect(() => {
@@ -1157,7 +1161,7 @@ function DealDetailModal({
   // Smart save on close - check for changes and save them
   const handleClose = async () => {
     if (hasChanges) {
-      const changes: { sharedWith?: string | null; salesperson?: string; notes?: string } = {}
+      const changes: { sharedWith?: string | null; salesperson?: string; notes?: string; planTotal?: number } = {}
       if (sharedWith !== (deal.sharedWith || '')) {
         changes.sharedWith = sharedWith || null
       }
@@ -1166,6 +1170,9 @@ function DealDetailModal({
       }
       if (notes !== (deal.notes || '')) {
         changes.notes = notes
+      }
+      if (planTotalNum !== deal.planTotal) {
+        changes.planTotal = planTotalNum
       }
       await onUpdateDeal(deal.id, changes)
     }
@@ -1189,7 +1196,7 @@ function DealDetailModal({
     setShowAddPayment(false)
   }
 
-  const balance = deal.planTotal - deal.collected
+  const balance = planTotalNum - deal.collected
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1210,19 +1217,39 @@ function DealDetailModal({
           {/* Summary */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center p-3 bg-gray-50 dark:bg-[#212429] rounded-lg">
-              <div className="text-lg font-bold dark:text-zinc-100">
-                {formatCurrency(deal.planTotal)}
-                {deal.invoiceLink && (
-                  <a 
-                    href={deal.invoiceLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="ml-1 hover:opacity-70 text-chart-5 inline-flex"
-                    title="View invoice"
-                  ><FileSpreadsheet className="h-4 w-4" /></a>
-                )}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total</div>
+              {editingPlanTotal ? (
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-lg font-bold dark:text-zinc-100">$</span>
+                  <input
+                    type="number"
+                    value={planTotal}
+                    onChange={(e) => setPlanTotal(e.target.value)}
+                    onBlur={() => setEditingPlanTotal(false)}
+                    onKeyDown={(e) => e.key === 'Enter' && setEditingPlanTotal(false)}
+                    className="w-24 text-lg font-bold text-center border dark:border-zinc-600 rounded px-1 py-0.5 dark:bg-[#212429] dark:text-zinc-100"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div 
+                  className="text-lg font-bold dark:text-zinc-100 cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                  onClick={() => !isSalesperson && setEditingPlanTotal(true)}
+                  title={isSalesperson ? '' : 'Click to edit'}
+                >
+                  {formatCurrency(planTotalNum)}
+                  {deal.invoiceLink && (
+                    <a 
+                      href={deal.invoiceLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ml-1 hover:opacity-70 text-chart-5 inline-flex"
+                      title="View invoice"
+                      onClick={(e) => e.stopPropagation()}
+                    ><FileSpreadsheet className="h-4 w-4" /></a>
+                  )}
+                </div>
+              )}
+              <div className="text-xs text-gray-500 dark:text-zinc-400">Plan Total {!isSalesperson && <span className="text-blue-400">(click to edit)</span>}</div>
             </div>
             <div className="text-center p-3 bg-success/10 rounded-lg">
               <div className="text-lg font-bold text-success">{formatCurrency(deal.collected)}</div>
