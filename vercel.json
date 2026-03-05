@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/sync-opportunities?clinic=TR04",
       "schedule": "2-59/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-mercury-checks",
+      "schedule": "0 8 * * *"
     }
   ]
 }
