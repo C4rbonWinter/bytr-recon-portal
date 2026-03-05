@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { 
   CheckCircle2, AlertTriangle, XCircle, Flag, FileSpreadsheet,
   Banknote, CreditCard, Cherry, Heart, FileText, Landmark, Receipt,
   Asterisk, Sun, Building2, Shield, Zap, Users2, FileCheck, Check, X,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, ArrowUp
 } from 'lucide-react'
 import { Header } from '@/components/header'
 
@@ -241,6 +241,13 @@ export default function Dashboard() {
   const [showMyView, setShowMyView] = useState(false) // Toggle for managers: false = All, true = Mine
   const [sortColumn, setSortColumn] = useState<'patient' | 'clinic' | 'salesperson' | 'planTotal' | 'collected' | 'balance' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Infinite scroll state
+  const BATCH_SIZE = 50
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
 
   // For managers with toggle: if showMyView is true, act as salesperson
   const effectiveRole = viewAsUser.isManager && showMyView ? 'salesperson' : viewAsUser.role
@@ -277,6 +284,42 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDeals()
+  }, [])
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(BATCH_SIZE)
+  }, [clinicFilter, statusFilter, salespersonFilter, monthFilter, searchQuery, sortColumn, sortDirection])
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(prev => prev + BATCH_SIZE)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [])
+
+  // Scroll listener for "scroll to top" button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
   const handleAddPayment = async (dealId: string, payment: Omit<Payment, 'id' | 'verified'>) => {
@@ -515,6 +558,10 @@ export default function Dashboard() {
     return 0
   })
 
+  // Slice for infinite scroll (show only visibleCount deals)
+  const visibleDeals = sortedDeals.slice(0, visibleCount)
+  const hasMore = visibleCount < sortedDeals.length
+
   // Stats based on filtered deals (correlates with time period filter)
   const totalPlanned = filteredDeals.reduce((sum, d) => sum + d.planTotal, 0)
   const totalCollected = filteredDeals.reduce((sum, d) => sum + d.collected, 0)
@@ -658,7 +705,12 @@ export default function Dashboard() {
         </div>
 
         {/* Deals Table */}
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm text-muted-foreground">
+            Showing {Math.min(visibleCount, sortedDeals.length)} of {sortedDeals.length} deals
+          </div>
+        </div>
+        <div ref={tableContainerRef} className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full">
             <thead className="bg-secondary border-b border-border">
               <tr>
@@ -722,7 +774,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {sortedDeals.map((deal) => (
+              {visibleDeals.map((deal) => (
                 <tr key={deal.id} className="hover:bg-secondary/50 cursor-pointer transition-colors" onClick={() => setSelectedDeal(deal)}>
                   <td className="px-4 py-3 font-medium text-foreground">
                     {deal.patientName}
@@ -761,7 +813,32 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
+        
+        {/* Load more trigger for infinite scroll */}
+        {hasMore && (
+          <div ref={loadMoreRef} className="py-8 text-center text-muted-foreground text-sm">
+            Loading more...
+          </div>
+        )}
+        
+        {/* End of list indicator */}
+        {!hasMore && sortedDeals.length > BATCH_SIZE && (
+          <div className="py-4 text-center text-muted-foreground text-xs">
+            All {sortedDeals.length} deals loaded
+          </div>
+        )}
       </main>
+
+      {/* Scroll to top button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 p-3 bg-foreground text-background rounded-full shadow-lg hover:bg-foreground/90 transition-all z-40"
+          title="Back to top"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
 
       {/* New Deal Modal */}
       {showNewDeal && (
